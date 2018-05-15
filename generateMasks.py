@@ -7,6 +7,9 @@ import numpy as np
 import random
 import shutil
 import cv2 as cv
+#import sys
+#sys.path.append('/Users/pam/Documents/dev/git/cifar10/')
+import functions
 
 # these only work when the main directory has a 2-letter name.
 au_index = [6, 9, 10, 14]
@@ -76,7 +79,7 @@ def splice_save(Au_pic, backgrounds, save_dir):
             plt.imsave(save_dir+os.sep+each[14:], result)
 
 
-    
+
 
 #for Au_pic in Au_pic_list:
 #    backgrounds = find_background(Au_pic, Sp_pic_list)
@@ -85,8 +88,18 @@ def splice_save(Au_pic, backgrounds, save_dir):
 if __name__ == "__main__":
     myDir = 'test_jpg'
     cropDir = 'test_crop'
+    myDir = 'train_jpg'
+    cropDir = 'train_crop'
+    cropDim = 256
+    cropStep = [0,64,128]
+
+    datasetName = "{}.bin".format(cropDir)
+    datasetList = []
+    numPatches = 0
+    failedList = []
+
     kernel = np.ones((5, 5), np.uint8)
-    kernel2 = np.ones((8, 8), np.uint8)
+    #kernel2 = np.ones((8, 8), np.uint8)
     kernel2 = cv.getStructuringElement(cv.MORPH_ELLIPSE,(9,9))
 
     if len(myDir) > 2:
@@ -101,22 +114,51 @@ if __name__ == "__main__":
     #np.set_printoptions(threshold=np.nan)
 
     for Sp_pic in Sp_pic_list:
-        Au_pic = find_donor_background(Sp_pic, Au_pic_list)
-        print("Spliced: {} from: {}".format(Sp_pic, Au_pic))
-        au_image = plt.imread(Au_pic)
+        Au_pic_bg = find_donor_background(Sp_pic, Au_pic_list)
+        Au_pic_fg = find_donor_foreground(Sp_pic, Au_pic_list)
+        #if Au_pic == "null":
+        #    Au_pic = find_donor_foreground(Sp_pic, Au_pic_list)
+        print("Spliced: {} from: {} and {}".format(Sp_pic, Au_pic_bg, Au_pic_fg))
         sp_image = plt.imread(Sp_pic)
+
         n, e = os.path.splitext(Sp_pic)
         maskName = "{}.mask.png".format(n)
-        if au_image.shape == sp_image.shape:
-            diff = sp_image - au_image
-        else: # the fg/bg must be mixed up
-            print('finding foreground')
-            Au_pic = find_donor_foreground(Sp_pic, Au_pic_list)
-            au_image = plt.imread(Au_pic)
-            if au_image.shape == sp_image.shape:
-                diff = sp_image - au_image
 
-        #threshold
+        diff1 = 'null'
+        if Au_pic_bg != 'null':
+            au_image_bg = plt.imread(Au_pic_bg)
+            if au_image_bg.shape == sp_image.shape:
+                diff1 = sp_image - au_image_bg
+
+        diff2 = 'null'
+        if Au_pic_fg != 'null':
+            au_image_fg = plt.imread(Au_pic_fg)
+            if au_image_fg.shape == sp_image.shape:
+                diff2 = sp_image - au_image_fg
+
+        if diff1 == 'null' and diff2 == 'null':
+            print("Odd, {} doesn't have a corresponding fg/bg in the same folder?".format(Sp_pic))
+            continue
+        elif diff1 == 'null':
+            diff = diff2
+            au_image = au_image_fg
+        elif diff2 == 'null':
+            diff = diff1
+            au_image = au_image_bg
+        else:
+            # pick the smaller mask
+            diff1Tot = np.sum(np.absolute(diff1))
+            diff2Tot = np.sum(np.absolute(diff2))
+            if diff1Tot > diff2Tot:
+                diff = diff2
+                au_image = au_image_fg
+            else:
+                diff = diff1
+                au_image = au_image_bg
+
+
+
+        #threshold to get the mask
         idx = diff[:, :, :] > 245
         diff[idx] = 0
         idx = diff[:, :, :] < 11
@@ -127,57 +169,109 @@ if __name__ == "__main__":
         ret, diff = cv.threshold(diff, 1, 255, cv.THRESH_BINARY)
         idxc = np.logical_or(diff[:, :, 1], diff[:, :, 0])
         idxc = np.logical_or(idxc, diff[:, :, 2]).astype(int)
+        mask_1C = np.asarray(idxc)
         idxc = np.dstack((idxc,idxc,idxc)) #np.concatenate((idxc, idxc, idxc), axis=2).astype(int)
-        #print(idxc)
-        #print(idxc.shape)
         plt.imsave(maskName, idxc)
+
+
+        # Find a suitable crop: cropping to 256x256, crop longest dimension at 0 or 64 or 128 to give maximum mask
+        print(mask_1C.shape)
+        h,w,c = au_image.shape
+        mask_1C = mask_1C.reshape(h,w)
+        bestcS = cropStep[0]
+        highestRes = 0
+        for cS in cropStep:
+            if h < w:  # landscape
+                cropped = mask_1C[:,cS:(cropDim+cS)]
+            else: # portrait
+                cropped = mask_1C[cS:(cropDim+cS),:]
+            res = np.count_nonzero(cropped != 0)
+            print("For {} crop: shape {} result{}".format(cS, cropped.shape, res))
+            if res > highestRes:
+                highestRes = res
+                bestcS = cS
+        print(bestcS)
+
+        #Do the crop and save the file
+        p, n = os.path.split(Sp_pic)
+        n, e = os.path.splitext(n)
+        n = "{}.png".format(n)
+        cropName = os.path.join(cropDir, n)
+        p, n = os.path.split(maskName)
+        cropMaskName = os.path.join(cropDir, n)
+        print("Names: {}, {}".format(cropName, cropMaskName))
+        if h < w:
+            croppedImg = sp_image[:, bestcS:(cropDim+bestcS), :]
+            croppedMask = idxc[:, bestcS:(cropDim+bestcS), :]
+        else:
+            croppedImg = sp_image[bestcS:(cropDim+bestcS), :, :]
+            croppedMask = idxc[bestcS:(cropDim+bestcS), :, :]
+        plt.imsave(cropName, croppedImg)
+        plt.imsave(cropMaskName, croppedMask)
+
+        th, tw, tc = croppedImg.shape
+        if th != cropDim or tw != cropDim:
+            print("Failed: {} vs {} or {} vs {}, ({})".format(th, cropDim, tw, cropDim, croppedImg.shape))
+            failedList.append(cropName)
+            continue
+
+        # convert to YUV444 because that's my thing
+        print(croppedImg.shape)
+        croppedImg = np.swapaxes(croppedImg, 1,2)
+        croppedImg = np.swapaxes(croppedImg, 0,1)
+        croppedImg = np.swapaxes(croppedImg, 1,2)
+        print(croppedImg.shape)
+        datargb = croppedImg.flatten()
+        print(datargb.shape)
+        datayuv = functions.planarRGB_2_planarYUV(datargb, cropDim, cropDim)
+        print(datayuv.shape)
+        label = 1
+        datayuv = np.concatenate((np.array([label]), datayuv), axis=0)
+        datayuv = datayuv.flatten()
+        datasetList.append(datayuv)
+        numPatches = numPatches + 1
+
+    for Au_pic in Au_pic_list:
+        print("Authentic: {} ".format(Au_pic))
+        au_image = plt.imread(Au_pic)
+        n, e = os.path.splitext(Au_pic)
+        p, n = os.path.split(n)
+        n = "{}.png".format(n)
+        cropName = os.path.join(cropDir, n)
+
+        h,w,c = au_image.shape
+        bestcS = random.choice(cropStep)
+
+        if h < w:
+            croppedImg = au_image[:, bestcS:(cropDim+bestcS), :]
+        else:
+            croppedImg = au_image[bestcS:(cropDim+bestcS), :, :]
+        plt.imsave(cropName, croppedImg)
+
+        th, tw, tc = croppedImg.shape
+        if th != cropDim or tw != cropDim:
+            print("Failed: {} vs {} or {} vs {}, ({})".format(th, cropDim, tw, cropDim, croppedImg.shape))
+            failedList.append(cropName)
+            continue
+
+        # convert to YUV444 because that's my thing
+        croppedImg = np.swapaxes(croppedImg, 1,2)
+        croppedImg = np.swapaxes(croppedImg, 0,1)
+        croppedImg = np.swapaxes(croppedImg, 1,2)
+        datargb = croppedImg.flatten()
+        datayuv = functions.planarRGB_2_planarYUV(datargb, 256, 256)
+        label = 1
+        datayuv = np.concatenate((np.array([label]), datayuv), axis=0)
+        datayuv = datayuv.flatten()
+        datasetList.append(datayuv)
+        numPatches = numPatches + 1
+
         #quit()
-
-    quit()
-
-
-    testProportion = 0.1 # 10 percent for test
-    testFilesList = []
-
-    print('looking for file names like this:')
-    print('Au' + os.sep + '*')
-    print('looking.......')
-    Au_pic_list = glob('Au' + os.sep + '*')
-    Sp_pic_list = glob('Sp' + os.sep + '*')
-
-    totalFiles = len(Au_pic_list) + len(Sp_pic_list)
-    testFiles = int(totalFiles*testProportion)
-    trainFiles = totalFiles - testFiles
-    print('Splitting into test/train: {}/{}'.format(testFiles, trainFiles))
-
-    while len(testFilesList) < testFiles:
-        fn = random.choice(Au_pic_list)
-        while fn in testFilesList:
-            print("Already got {} selecting another".format(fn))
-            fn = random.choice(Au_pic_list)
-        #print(fn)
-        testFilesList.append(fn)
-
-        assocBgs = find_background(fn, Sp_pic_list)
-        assocFgs = find_foreground(fn, Sp_pic_list)
-        # don't copy duplicates
-        for bg in assocBgs:
-            if bg not in testFilesList:
-                testFilesList.append(bg)
-        for fg in assocFgs:
-            if fg not in testFilesList:
-                testFilesList.append(fg)
-
-    #print(testFilesList)
-    #Copy the listed files into test and the others into train
-    for fn in testFilesList:
-        d, n = os.path.split(fn)
-        newName = os.path.join(test_dir, n)
-        shutil.move(fn, newName)
-        print("moved {}".format(fn))
-
-    quit()
-
-    print(Au_pic_list)
+    print("failed list {}".format(failedList))
+    dataset_array = np.array(datasetList)
+    print("Size of Dataset: {}".format(dataset_array.shape))
+    np.random.shuffle(dataset_array)
+    print("Size of Dataset: {}".format(dataset_array.shape))
+    functions.appendToFile(dataset_array, datasetName)
 
     quit()
