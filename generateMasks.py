@@ -219,13 +219,14 @@ if __name__ == "__main__":
         print(croppedImg.shape)
         croppedImg = np.swapaxes(croppedImg, 1,2)
         croppedImg = np.swapaxes(croppedImg, 0,1)
-        croppedImg = np.swapaxes(croppedImg, 1,2)
+        #croppedImg = np.swapaxes(croppedImg, 1,2)
         print(croppedImg.shape)
         datargb = croppedImg.flatten()
         print(datargb.shape)
         datayuv = functions.planarRGB_2_planarYUV(datargb, cropDim, cropDim)
         print(datayuv.shape)
         label = 1
+        datayuv = np.divide(datayuv, 8) # normalise
         datayuv = np.concatenate((np.array([label]), datayuv), axis=0)
         datayuv = datayuv.flatten()
         datasetList.append(datayuv)
@@ -257,10 +258,11 @@ if __name__ == "__main__":
         # convert to YUV444 because that's my thing
         croppedImg = np.swapaxes(croppedImg, 1,2)
         croppedImg = np.swapaxes(croppedImg, 0,1)
-        croppedImg = np.swapaxes(croppedImg, 1,2)
+        #croppedImg = np.swapaxes(croppedImg, 1,2)
         datargb = croppedImg.flatten()
         datayuv = functions.planarRGB_2_planarYUV(datargb, 256, 256)
-        label = 1
+        label = 0
+        datayuv = np.divide(datayuv, 8) # normalise
         datayuv = np.concatenate((np.array([label]), datayuv), axis=0)
         datayuv = datayuv.flatten()
         datasetList.append(datayuv)
