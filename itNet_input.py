@@ -25,8 +25,8 @@ INPUT_IMAGE_HEIGHT = 256
 # Number of classes
 NUM_CLASSES = 2
 # This is the number of training examples in the dataset - one epoch runs over all the examples
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 1539 # all_cif
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 177
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 15782 # CASIA2
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 1950
 
 
 def read_dataset(filename_queue):
@@ -150,7 +150,8 @@ def distorted_inputs(data_dir, batch_size, distort=2):
   print("From within distorted_inputs, data_dir = {}here".format(data_dir))
   #filenames = [os.path.join(data_dir, 'patches_%d.bin' % i) for i in xrange(0, 8)]
   #filenames = [os.path.join(data_dir, 'patches_train_%d.bin' % i) for i in xrange(0, 1)]
-  filenames = [os.path.join(data_dir, 'train_crop.bin')]
+  #filenames = [os.path.join(data_dir, 'train_crop.bin')]
+  filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
 
   print("Expected filenames: {}".format(filenames))
 
@@ -230,11 +231,13 @@ def inputs(eval_data, data_dir, batch_size):
     #filenames = [os.path.join(data_dir, 'patches_%d.bin' % i) for i in xrange(0, 8)] # original based on CIF vid
     filenames = [os.path.join(data_dir, 'patches_train_%d.bin' % i) for i in xrange(0, 1)]
     filenames = [os.path.join(data_dir, 'train_crop.bin')]
+    filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
   else:
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
     filenames = [os.path.join(data_dir, 'patches_test_%d.bin' % i) for i in xrange(0, 1)]
     filenames = [os.path.join(data_dir, 'test_crop.bin')]
+    filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
     print("Inputting test data which is {}".format(filenames))
 
 
