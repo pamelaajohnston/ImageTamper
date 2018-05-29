@@ -259,7 +259,7 @@ def train():
     # True to build towers on GPU, as some of the ops do not have GPU
     # implementations.
 
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
     #sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
     sess = tf.Session(config=tf.ConfigProto(
