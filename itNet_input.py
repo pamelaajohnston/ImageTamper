@@ -237,7 +237,7 @@ def inputs(eval_data, data_dir, batch_size):
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
     filenames = [os.path.join(data_dir, 'patches_test_%d.bin' % i) for i in xrange(0, 1)]
     filenames = [os.path.join(data_dir, 'test_crop.bin')]
-    filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
+    #filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
     print("Inputting test data which is {}".format(filenames))
 
 
