@@ -279,12 +279,12 @@ def evaluate(returnConfusionMatrix=True):
                 break
             if FLAGS.run_times == 0: #only sleep when it's not a limited run
                 time.sleep(FLAGS.eval_interval_secs)
+            np.set_printoptions(threshold='nan')
             print('%s: precision @ 1 = %.3f' % (datetime.now(), precision))
             print('{}: confusionMatrix: \n {}'.format(datetime.now(), confusionMatrix))
             print('AND predictions (provided you only used one thread!!!): \n ')
             print(np.array2string(predLabels, separator=', '))
             #print('AND predictions: \n')
-            #np.set_printoptions(threshold='nan')
             #print("{}".format(repr(predLabels)))
             #avg = np.average(predLabels)
             #print("Average is {}".format(avg))
