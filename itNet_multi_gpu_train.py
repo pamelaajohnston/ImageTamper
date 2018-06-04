@@ -246,8 +246,7 @@ def train():
     train_op = tf.group(apply_gradient_op, variables_averages_op)
 
     # Create a saver (which is deprecated in version 1.4)
-    #saver = tf.train.Saver(tf.all_variables())
-    saver = tf.train.Saver(tf.global_variables())
+    saver = tf.train.Saver(tf.global_variables(), max_to_keep=2)
 
     # Build the summary operation from the last tower summaries.
     summary_op = tf.summary.merge(summaries)
