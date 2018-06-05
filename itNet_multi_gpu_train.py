@@ -101,7 +101,8 @@ def tower_loss(scope):
   total_loss = tf.add_n(losses, name='total_loss')
 
   # Compute the moving average of all individual losses and the total loss.
-  if FLAGS.num_gpus > 1:
+  print(FLAGS.num_gpus)
+  if FLAGS.num_gpus <= 1:
       loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
       print("********************")
       print(losses)
