@@ -432,7 +432,7 @@ def inference_2(images):
   # It converged on CIFAR-10, 64x64 but it's accuracy was 10% (so it didn't learn anything!).
   # Probably need to work out how to add drop out to this.
   # conv1
-  with tf.variable_scope('conv1') as scope:
+  with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[7, 7, 3, 96],
                                          stddev=5e-2,
@@ -449,7 +449,7 @@ def inference_2(images):
   pool1 = tf.nn.max_pool(norm1, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool1')
 
   # conv2
-  with tf.variable_scope('conv2') as scope:
+  with tf.variable_scope('conv2', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[5, 5, 96, 256],
                                          stddev=5e-2,
@@ -467,7 +467,7 @@ def inference_2(images):
 
 
   # conv3
-  with tf.variable_scope('conv3') as scope:
+  with tf.variable_scope('conv3', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 256, 384],
                                          stddev=5e-2,
@@ -479,7 +479,7 @@ def inference_2(images):
     _activation_summary(conv3)
 
   # conv4
-  with tf.variable_scope('conv4') as scope:
+  with tf.variable_scope('conv4', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 384, 384],
                                          stddev=5e-2,
@@ -491,7 +491,7 @@ def inference_2(images):
     _activation_summary(conv4)
 
   # conv5
-  with tf.variable_scope('conv5') as scope:
+  with tf.variable_scope('conv5', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 384, 256],
                                          stddev=5e-2,
@@ -506,7 +506,7 @@ def inference_2(images):
   pool5 = tf.nn.max_pool(conv5, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name='pool5')
 
   # fc6
-  with tf.variable_scope('fc6') as scope:
+  with tf.variable_scope('fc6', reuse=tf.AUTO_REUSE) as scope:
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(pool5, [FLAGS.batch_size, -1])
     dim = reshape.get_shape()[1].value
@@ -517,7 +517,7 @@ def inference_2(images):
     _activation_summary(fc6)
 
   # fc7
-  with tf.variable_scope('fc7') as scope:
+  with tf.variable_scope('fc7', reuse=tf.AUTO_REUSE) as scope:
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(fc6, [FLAGS.batch_size, -1])
     dim = reshape.get_shape()[1].value
@@ -528,7 +528,7 @@ def inference_2(images):
     _activation_summary(fc7)
 
   # fc8
-  with tf.variable_scope('fc8') as scope:
+  with tf.variable_scope('fc8', reuse=tf.AUTO_REUSE) as scope:
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(fc7, [FLAGS.batch_size, -1])
     dim = reshape.get_shape()[1].value
@@ -539,7 +539,7 @@ def inference_2(images):
     _activation_summary(fc8)
 
   # softmax, i.e. softmax(WX + b)
-  with tf.variable_scope('softmax_linear') as scope:
+  with tf.variable_scope('softmax_linear', reuse=tf.AUTO_REUSE) as scope:
     weights = _variable_with_weight_decay('weights', [10, NUM_CLASSES],
                                           stddev=1/10.0, wd=0.0)
     biases = _variable_on_cpu('biases', [NUM_CLASSES],

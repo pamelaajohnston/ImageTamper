@@ -101,22 +101,29 @@ def tower_loss(scope):
   total_loss = tf.add_n(losses, name='total_loss')
 
   # Compute the moving average of all individual losses and the total loss.
-  loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
-  loss_averages_op = loss_averages.apply(losses + [total_loss])
+  if FLAGS.num_gpus > 1:
+      loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
+      print("********************")
+      print(losses)
+      print(total_loss)
+      print(loss_averages)
+      print("********************")
+      loss_averages_op = loss_averages.apply(losses + [total_loss])
+      print("++++++++++++++++++++")
 
-  # Attach a scalar summary to all individual losses and the total loss; do the
-  # same for the averaged version of the losses.
-  for l in losses + [total_loss]:
-    # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
-    # session. This helps the clarity of presentation on tensorboard.
-    loss_name = re.sub('%s_[0-9]*/' % itNet.TOWER_NAME, '', l.op.name)
-    # Name each loss as '(raw)' and name the moving average version of the loss
-    # as the original loss name.
-    tf.summary.scalar(loss_name +' (raw)', l)
-    tf.summary.scalar(loss_name, loss_averages.average(l))
+      # Attach a scalar summary to all individual losses and the total loss; do the
+      # same for the averaged version of the losses.
+      for l in losses + [total_loss]:
+        # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
+        # session. This helps the clarity of presentation on tensorboard.
+        loss_name = re.sub('%s_[0-9]*/' % itNet.TOWER_NAME, '', l.op.name)
+        # Name each loss as '(raw)' and name the moving average version of the loss
+        # as the original loss name.
+        tf.summary.scalar(loss_name +' (raw)', l)
+        tf.summary.scalar(loss_name, loss_averages.average(l))
 
-  with tf.control_dependencies([loss_averages_op]):
-    total_loss = tf.identity(total_loss)
+      with tf.control_dependencies([loss_averages_op]):
+        total_loss = tf.identity(total_loss)
   return total_loss
 
 
@@ -195,7 +202,7 @@ def train():
 
     # Calculate the gradients for each model tower.
     tower_grads = []
-    with tf.variable_scope(tf.get_variable_scope()):
+    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
         for i in xrange(FLAGS.num_gpus):
           with tf.device('/gpu:%d' % i):
             with tf.name_scope('%s_%d' % (itNet.TOWER_NAME, i)) as scope:
