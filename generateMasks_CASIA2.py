@@ -92,14 +92,22 @@ def splice_save(Au_pic, backgrounds, save_dir):
 #    splice_save(Au_pic, backgrounds, save_dir)
 
 if __name__ == "__main__":
-    myDir = 'test'
+    myDir = '/Volumes/LaCie/data/CASIA2/test'
     cropDir = 'test_crop'
-    myDir = 'train'
-    cropDir = 'train_crop'
+    #myDir = 'train'
+    #cropDir = 'train_crop'
     cropDim = 256
     cropStep = 64
 
+    shuffled = False
+
     datasetName = "{}.bin".format(cropDir)
+    if shuffled == False:
+        datasetName = "{}_unshuffled".format(cropDir)
+
+    # for the unshuffled - lets have the file names in order
+    unshuffledNames = []
+
     datasetList = []
     numPatches = 0
     failedList = []
@@ -119,6 +127,7 @@ if __name__ == "__main__":
 
     #print(Sp_pic_list)
     #print(Au_pic_list)
+    #quit()
     #np.set_printoptions(threshold=np.nan)
 
     for Sp_pic in Sp_pic_list:
@@ -234,6 +243,7 @@ if __name__ == "__main__":
             croppedImg = sp_image[y:(cropDim+y), x:(cropDim+x), :]
             croppedMask = idxc[y:(cropDim+y), x:(cropDim+x), :]
             plt.imsave(cropName, croppedImg)
+            unshuffledNames.append(cropName)
             plt.imsave(cropMaskName, croppedMask)
             patchNo = patchNo + 1
 
@@ -274,6 +284,7 @@ if __name__ == "__main__":
                 cropName = os.path.join(cropDir, n)
                 croppedImg = au_image[cSy:(cropDim + cSy), cSx:(cropDim + cSx), :]
                 plt.imsave(cropName, croppedImg)
+                unshuffledNames.append(cropName)
                 # convert to YUV444 because that's my thing
                 croppedImg = np.swapaxes(croppedImg, 1,2)
                 croppedImg = np.swapaxes(croppedImg, 0,1)
@@ -293,12 +304,21 @@ if __name__ == "__main__":
     print("failed list {}".format(failedList))
     dataset_array = np.array(datasetList)
     print("Size of Dataset: {}".format(dataset_array.shape))
-    np.random.shuffle(dataset_array)
-    print("Size of Dataset: {}".format(dataset_array.shape))
+    if shuffled:
+        np.random.shuffle(dataset_array)
+        print("Size of Dataset: {}".format(dataset_array.shape))
     functions.appendToFile(dataset_array, datasetName)
 
     numFrags = 10
+    if shuffled == False:
+        numFrags = 1
+        # print the file names list to a file
+        with open("{}_names.txt".format(datasetName), "w") as ff:
+            for item in unshuffledNames:
+                ff.write("%s\n" % item)
+
     patchesPerFrag = dataset_array.shape[0] // numFrags
+    print(patchesPerFrag)
     for x in range(0,numFrags):
         fragName = "{}_{}.bin".format(datasetName, x)
         start = x * patchesPerFrag

@@ -43,6 +43,7 @@ tf.app.flags.DEFINE_string('data_dir', 'qpDataset', """Path to the directory."""
 tf.app.flags.DEFINE_string('batches_dir', ' ', """Path to the secondary data directory.""")
 tf.app.flags.DEFINE_boolean('use_fp16', False, """Train the model using fp16.""")
 tf.app.flags.DEFINE_integer('binarise_label', 0, """Binarise this label""")
+tf.app.flags.DEFINE_integer('training', True, """Training cycle""")
 
 #tf.app.flags.DEFINE_string('prelearned_checkpoint', '/Users/pam/Documents/data/CIFAR-10/test3/cifar10_train/train_yuv/model.ckpt-29999', """The same network architecture trained on something else""")
 
@@ -329,6 +330,8 @@ def inference_switch(images, type=1):
         return inference_10(images, 0.8)
     elif type == 22:
         return inference_10(images, 0.2)
+    elif type == 23:
+        return inference_13(images)
 
 
 def inference(images):
@@ -548,6 +551,185 @@ def inference_2(images):
     _activation_summary(softmax_linear)
 
   return softmax_linear
+
+# from https://gist.github.com/tomokishii/0ce3bdac1588b5cca9fa5fbdf6e1c412
+def batch_norm(x, n_out, phase_train):
+    """
+    Batch normalization on convolutional maps.
+    Ref.: http://stackoverflow.com/questions/33949786/how-could-i-use-batch-normalization-in-tensorflow
+    Args:
+        x:           Tensor, 4D BHWD input maps
+        n_out:       integer, depth of input maps
+        phase_train: boolean tf.Varialbe, true indicates training phase
+        scope:       string, variable scope
+    Return:
+        normed:      batch-normalized maps
+    """
+    with tf.variable_scope('bn'):
+        beta = tf.Variable(tf.constant(0.0, shape=[n_out]),
+                                     name='beta', trainable=True)
+        gamma = tf.Variable(tf.constant(1.0, shape=[n_out]),
+                                      name='gamma', trainable=True)
+        batch_mean, batch_var = tf.nn.moments(x, [0,1,2], name='moments')
+        ema = tf.train.ExponentialMovingAverage(decay=0.5)
+
+        def mean_var_with_update():
+            ema_apply_op = ema.apply([batch_mean, batch_var])
+            with tf.control_dependencies([ema_apply_op]):
+                return tf.identity(batch_mean), tf.identity(batch_var)
+
+        mean, var = tf.cond(phase_train,
+                            mean_var_with_update,
+                            lambda: (ema.average(batch_mean), ema.average(batch_var)))
+        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-3)
+    return normed
+
+def inference_23(images):
+  """Build the model.
+
+  Args:
+    images: Images returned from distorted_inputs() or inputs().
+
+  Returns:
+    Logits.
+
+  Notes:
+      It's a different network from the original one, see how it goes....
+  """
+  # We instantiate all variables using tf.get_variable() instead of
+  # tf.Variable() in order to share variables across multiple GPU training runs.
+  # If we only ran this model on a single GPU, we could simplify this function
+  # by replacing all instances of tf.get_variable() with tf.Variable().
+  #
+  # PAJ: This is Pam's version of AlexNet for CIFAR-10. Same number of conv and fc layers.
+  # It converged on CIFAR-10, 64x64 but it's accuracy was 10% (so it didn't learn anything!).
+  # Probably need to work out how to add drop out to this.
+  # conv1
+  with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[7, 7, 3, 96],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
+    biases = _variable_on_cpu('biases', [96], tf.constant_initializer(0.0))
+
+    # batch norm
+    normed = batch_norm(conv, 96, FLAGS.training)
+
+    bias = tf.nn.bias_add(normed, biases)
+    conv1 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv1)
+  # norm1
+  norm1 = tf.nn.lrn(conv1, 2, bias=1.0, alpha=2e-05 , beta=0.75, name='norm1')
+
+  # pool1
+  pool1 = tf.nn.max_pool(norm1, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool1')
+
+  # conv2
+  with tf.variable_scope('conv2', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[5, 5, 96, 256],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
+    biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv2 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv2)
+
+  # norm2
+  norm2 = tf.nn.lrn(conv2, 2, bias=1.0, alpha=2e-05, beta=0.75, name='norm2')
+  # pool2
+  pool2 = tf.nn.max_pool(norm2, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name='pool2')
+
+
+  # conv3
+  with tf.variable_scope('conv3', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 256, 384],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
+    biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv3 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv3)
+
+  # conv4
+  with tf.variable_scope('conv4', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 384, 384],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv3, kernel, [1, 1, 1, 1], padding='SAME')
+    biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv4 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv4)
+
+  # conv5
+  with tf.variable_scope('conv5', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 384, 256],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv4, kernel, [1, 1, 1, 1], padding='SAME')
+    biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv5 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv5)
+
+  #pool5
+  pool5 = tf.nn.max_pool(conv5, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID', name='pool5')
+
+  # fc6
+  with tf.variable_scope('fc6', reuse=tf.AUTO_REUSE) as scope:
+    # Move everything into depth so we can perform a single matrix multiply.
+    reshape = tf.reshape(pool5, [FLAGS.batch_size, -1])
+    dim = reshape.get_shape()[1].value
+    weights = _variable_with_weight_decay('weights', shape=[dim, 512],
+                                          stddev=0.04, wd=0.004)
+    biases = _variable_on_cpu('biases', [512], tf.constant_initializer(0.1))
+    fc6 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    _activation_summary(fc6)
+
+  # fc7
+  with tf.variable_scope('fc7', reuse=tf.AUTO_REUSE) as scope:
+    # Move everything into depth so we can perform a single matrix multiply.
+    reshape = tf.reshape(fc6, [FLAGS.batch_size, -1])
+    dim = reshape.get_shape()[1].value
+    weights = _variable_with_weight_decay('weights', shape=[dim, 256],
+                                          stddev=0.04, wd=0.004)
+    biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+    fc7 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    _activation_summary(fc7)
+
+  # fc8
+  with tf.variable_scope('fc8', reuse=tf.AUTO_REUSE) as scope:
+    # Move everything into depth so we can perform a single matrix multiply.
+    reshape = tf.reshape(fc7, [FLAGS.batch_size, -1])
+    dim = reshape.get_shape()[1].value
+    weights = _variable_with_weight_decay('weights', shape=[dim, 10],
+                                          stddev=0.04, wd=0.004)
+    biases = _variable_on_cpu('biases', [10], tf.constant_initializer(0.1))
+    fc8 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    _activation_summary(fc8)
+
+  # softmax, i.e. softmax(WX + b)
+  with tf.variable_scope('softmax_linear', reuse=tf.AUTO_REUSE) as scope:
+    weights = _variable_with_weight_decay('weights', [10, NUM_CLASSES],
+                                          stddev=1/10.0, wd=0.0)
+    biases = _variable_on_cpu('biases', [NUM_CLASSES],
+                              tf.constant_initializer(0.0))
+    softmax_linear = tf.add(tf.matmul(fc8, weights), biases, name=scope.name)
+    _activation_summary(softmax_linear)
+
+  return softmax_linear
+
+
+
+
+
 
 
 def inference_3(images):
