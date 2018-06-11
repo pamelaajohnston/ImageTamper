@@ -43,7 +43,7 @@ tf.app.flags.DEFINE_string('data_dir', 'qpDataset', """Path to the directory."""
 tf.app.flags.DEFINE_string('batches_dir', ' ', """Path to the secondary data directory.""")
 tf.app.flags.DEFINE_boolean('use_fp16', False, """Train the model using fp16.""")
 tf.app.flags.DEFINE_integer('binarise_label', 0, """Binarise this label""")
-tf.app.flags.DEFINE_integer('training', True, """Training cycle""")
+tf.app.flags.DEFINE_integer('training', 1, """Training cycle""")
 
 #tf.app.flags.DEFINE_string('prelearned_checkpoint', '/Users/pam/Documents/data/CIFAR-10/test3/cifar10_train/train_yuv/model.ckpt-29999', """The same network architecture trained on something else""")
 
