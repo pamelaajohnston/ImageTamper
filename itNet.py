@@ -331,7 +331,7 @@ def inference_switch(images, type=1):
     elif type == 22:
         return inference_10(images, 0.2)
     elif type == 23:
-        return inference_13(images)
+        return inference_23(images)
 
 
 def inference(images):
