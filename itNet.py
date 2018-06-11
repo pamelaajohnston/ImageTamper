@@ -596,14 +596,10 @@ def inference_23(images):
   Notes:
       It's a different network from the original one, see how it goes....
   """
-  # We instantiate all variables using tf.get_variable() instead of
-  # tf.Variable() in order to share variables across multiple GPU training runs.
-  # If we only ran this model on a single GPU, we could simplify this function
-  # by replacing all instances of tf.get_variable() with tf.Variable().
-  #
-  # PAJ: This is Pam's version of AlexNet for CIFAR-10. Same number of conv and fc layers.
-  # It converged on CIFAR-10, 64x64 but it's accuracy was 10% (so it didn't learn anything!).
-  # Probably need to work out how to add drop out to this.
+  # PAJ: This is Pam's version of AlexNet for tampering detection. Same number of conv and fc layers.
+  # Using CASIA-2, it converged to 85% accuracy but it takes about 50k steps and sometimes it
+  # simply sticks at loss = 0.7 (that's inference_2 above)
+  # This version adds in batch normalisation and takes out biases because Andrew Ng says you can.
   # conv1
   with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
@@ -611,13 +607,15 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
-    biases = _variable_on_cpu('biases', [96], tf.constant_initializer(0.0))
 
     # batch norm
     normed = batch_norm(conv, 96, FLAGS.training)
 
-    bias = tf.nn.bias_add(normed, biases)
-    conv1 = tf.nn.relu(bias, name=scope.name)
+    # Andrew Ng says you don't need the biases...?
+    # Here https://www.coursera.org/learn/deep-neural-network/lecture/RN8bN/fitting-batch-norm-into-a-neural-network
+    #biases = _variable_on_cpu('biases', [96], tf.constant_initializer(0.0))
+    #bias = tf.nn.bias_add(normed, biases)
+    conv1 = tf.nn.relu(normed, name=scope.name)
     _activation_summary(conv1)
   # norm1
   norm1 = tf.nn.lrn(conv1, 2, bias=1.0, alpha=2e-05 , beta=0.75, name='norm1')
@@ -632,9 +630,11 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
-    biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
-    bias = tf.nn.bias_add(conv, biases)
-    conv2 = tf.nn.relu(bias, name=scope.name)
+    # batch norm
+    normed = batch_norm(conv, 256, FLAGS.training)
+    #biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+    #bias = tf.nn.bias_add(conv, biases)
+    conv2 = tf.nn.relu(normed, name=scope.name)
     _activation_summary(conv2)
 
   # norm2
@@ -650,9 +650,11 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
-    biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
-    bias = tf.nn.bias_add(conv, biases)
-    conv3 = tf.nn.relu(bias, name=scope.name)
+    # batch norm
+    normed = batch_norm(conv, 384, FLAGS.training)
+    #biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+    #bias = tf.nn.bias_add(conv, biases)
+    conv3 = tf.nn.relu(normed, name=scope.name)
     _activation_summary(conv3)
 
   # conv4
@@ -662,9 +664,11 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(conv3, kernel, [1, 1, 1, 1], padding='SAME')
-    biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
-    bias = tf.nn.bias_add(conv, biases)
-    conv4 = tf.nn.relu(bias, name=scope.name)
+    # batch norm
+    normed = batch_norm(conv, 384, FLAGS.training)
+    #biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+    #bias = tf.nn.bias_add(conv, biases)
+    conv4 = tf.nn.relu(normed, name=scope.name)
     _activation_summary(conv4)
 
   # conv5
@@ -674,9 +678,11 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(conv4, kernel, [1, 1, 1, 1], padding='SAME')
-    biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
-    bias = tf.nn.bias_add(conv, biases)
-    conv5 = tf.nn.relu(bias, name=scope.name)
+    # batch norm
+    normed = batch_norm(conv, 256, FLAGS.training)
+    #biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+    #bias = tf.nn.bias_add(conv, biases)
+    conv5 = tf.nn.relu(normed, name=scope.name)
     _activation_summary(conv5)
 
   #pool5
