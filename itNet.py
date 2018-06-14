@@ -284,7 +284,7 @@ def inference_switch(images, type=1):
     #    itNet_input.NUM_CLASSES = 3
 
 
-    #print("There are {} classes".format(NUM_CLASSES))
+    print("inference_switch: {}".format(type))
 
     if type == 1:
         return inference(images)
@@ -331,7 +331,12 @@ def inference_switch(images, type=1):
     elif type == 22:
         return inference_10(images, 0.2)
     elif type == 23:
-        return inference_23(images)
+        dropout_rate = 0.8
+        if FLAGS.training:
+            dropout_rate = 1.0
+        return inference_23(images, dropout_rate)
+    elif type == 24:
+        return inference_24(images)
 
 
 def inference(images):
@@ -351,7 +356,7 @@ def inference(images):
   # PAJ: This is the original from the CIFAR-10 tutorial. Expect 84% accuracy after 30k steps on CIFAR-10
 
   # conv1
-  with tf.variable_scope('conv1') as scope:
+  with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[5, 5, 3, 64],
                                          stddev=5e-2,
@@ -368,7 +373,7 @@ def inference(images):
   norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm1')
 
   # conv2
-  with tf.variable_scope('conv2') as scope:
+  with tf.variable_scope('conv2', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[5, 5, 64, 64],
                                          stddev=5e-2,
@@ -385,7 +390,7 @@ def inference(images):
   pool2 = tf.nn.max_pool(norm2, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool2')
 
   # local3
-  with tf.variable_scope('local3') as scope:
+  with tf.variable_scope('local3', reuse=tf.AUTO_REUSE) as scope:
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(pool2, [FLAGS.batch_size, -1])
     dim = reshape.get_shape()[1].value
@@ -396,7 +401,7 @@ def inference(images):
     _activation_summary(local3)
 
   # local4
-  with tf.variable_scope('local4') as scope:
+  with tf.variable_scope('local4', reuse=tf.AUTO_REUSE) as scope:
     weights = _variable_with_weight_decay('weights', shape=[384, 192],
                                           stddev=0.04, wd=0.004)
     biases = _variable_on_cpu('biases', [192], tf.constant_initializer(0.1))
@@ -404,7 +409,7 @@ def inference(images):
     _activation_summary(local4)
 
   # softmax, i.e. softmax(WX + b)
-  with tf.variable_scope('softmax_linear') as scope:
+  with tf.variable_scope('softmax_linear', reuse=tf.AUTO_REUSE) as scope:
     weights = _variable_with_weight_decay('weights', [192, NUM_CLASSES],
                                           stddev=1/192.0, wd=0.0)
     biases = _variable_on_cpu('biases', [NUM_CLASSES],
@@ -566,25 +571,31 @@ def batch_norm(x, n_out, phase_train):
         normed:      batch-normalized maps
     """
     with tf.variable_scope('bn'):
-        beta = tf.Variable(tf.constant(0.0, shape=[n_out]),
-                                     name='beta', trainable=True)
-        gamma = tf.Variable(tf.constant(1.0, shape=[n_out]),
-                                      name='gamma', trainable=True)
+        beta = tf.Variable(tf.constant(0.0, shape=[n_out]), name='beta', trainable=True)
+        gamma = tf.Variable(tf.constant(1.0, shape=[n_out]), name='gamma', trainable=True)
         batch_mean, batch_var = tf.nn.moments(x, [0,1,2], name='moments')
-        ema = tf.train.ExponentialMovingAverage(decay=0.5)
+        _activation_summary(beta)
+        _activation_summary(gamma)
+        _activation_summary(batch_mean)
+        _activation_summary(batch_var)
+
+        ema = tf.train.ExponentialMovingAverage(decay=MOVING_AVERAGE_DECAY)
 
         def mean_var_with_update():
             ema_apply_op = ema.apply([batch_mean, batch_var])
+
             with tf.control_dependencies([ema_apply_op]):
                 return tf.identity(batch_mean), tf.identity(batch_var)
 
         mean, var = tf.cond(tf.cast(phase_train, tf.bool),
                             mean_var_with_update,
                             lambda: (ema.average(batch_mean), ema.average(batch_var)))
+        #tf.summary.scalar(ema_apply_op.name, ema_apply_op.average(0))
         normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-3)
+        _activation_summary(normed)
     return normed
 
-def inference_23(images):
+def inference_23(images, dropOut_prob = 1.0, batchNorm = False):
   """Build the model.
 
   Args:
@@ -609,13 +620,15 @@ def inference_23(images):
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
 
     # batch norm
-    normed = batch_norm(conv, 96, FLAGS.training)
-
     # Andrew Ng says you don't need the biases...?
     # Here https://www.coursera.org/learn/deep-neural-network/lecture/RN8bN/fitting-batch-norm-into-a-neural-network
-    #biases = _variable_on_cpu('biases', [96], tf.constant_initializer(0.0))
-    #bias = tf.nn.bias_add(normed, biases)
-    conv1 = tf.nn.relu(normed, name=scope.name)
+    if batchNorm:
+        normed = batch_norm(conv, 96, FLAGS.training)
+        conv1 = tf.nn.relu(normed, name=scope.name)
+    else:
+        biases = _variable_on_cpu('biases', [96], tf.constant_initializer(0.0))
+        bias = tf.nn.bias_add(conv, biases)
+        conv1 = tf.nn.relu(bias, name=scope.name)
     _activation_summary(conv1)
   # norm1
   norm1 = tf.nn.lrn(conv1, 2, bias=1.0, alpha=2e-05 , beta=0.75, name='norm1')
@@ -630,11 +643,14 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
-    # batch norm
-    normed = batch_norm(conv, 256, FLAGS.training)
-    #biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
-    #bias = tf.nn.bias_add(conv, biases)
-    conv2 = tf.nn.relu(normed, name=scope.name)
+    if batchNorm:
+        # batch norm
+        normed = batch_norm(conv, 256, FLAGS.training)
+        conv2 = tf.nn.relu(normed, name=scope.name)
+    else:
+        biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+        bias = tf.nn.bias_add(conv, biases)
+        conv2 = tf.nn.relu(bias, name=scope.name)
     _activation_summary(conv2)
 
   # norm2
@@ -651,10 +667,13 @@ def inference_23(images):
                                          wd=0.0)
     conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
     # batch norm
-    normed = batch_norm(conv, 384, FLAGS.training)
-    #biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
-    #bias = tf.nn.bias_add(conv, biases)
-    conv3 = tf.nn.relu(normed, name=scope.name)
+    if batchNorm:
+        normed = batch_norm(conv, 384, FLAGS.training)
+        conv3 = tf.nn.relu(normed, name=scope.name)
+    else:
+        biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+        bias = tf.nn.bias_add(conv, biases)
+        conv3 = tf.nn.relu(bias, name=scope.name)
     _activation_summary(conv3)
 
   # conv4
@@ -665,10 +684,13 @@ def inference_23(images):
                                          wd=0.0)
     conv = tf.nn.conv2d(conv3, kernel, [1, 1, 1, 1], padding='SAME')
     # batch norm
-    normed = batch_norm(conv, 384, FLAGS.training)
-    #biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
-    #bias = tf.nn.bias_add(conv, biases)
-    conv4 = tf.nn.relu(normed, name=scope.name)
+    if batchNorm:
+        normed = batch_norm(conv, 384, FLAGS.training)
+        conv4 = tf.nn.relu(normed, name=scope.name)
+    else:
+        biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+        bias = tf.nn.bias_add(conv, biases)
+        conv4 = tf.nn.relu(bias, name=scope.name)
     _activation_summary(conv4)
 
   # conv5
@@ -678,11 +700,14 @@ def inference_23(images):
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(conv4, kernel, [1, 1, 1, 1], padding='SAME')
-    # batch norm
-    normed = batch_norm(conv, 256, FLAGS.training)
-    #biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
-    #bias = tf.nn.bias_add(conv, biases)
-    conv5 = tf.nn.relu(normed, name=scope.name)
+    if batchNorm:
+        # batch norm
+        normed = batch_norm(conv, 256, FLAGS.training)
+        conv5 = tf.nn.relu(normed, name=scope.name)
+    else:
+        biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
+        bias = tf.nn.bias_add(conv, biases)
+        conv5 = tf.nn.relu(bias, name=scope.name)
     _activation_summary(conv5)
 
   #pool5
@@ -696,7 +721,8 @@ def inference_23(images):
     weights = _variable_with_weight_decay('weights', shape=[dim, 512],
                                           stddev=0.04, wd=0.004)
     biases = _variable_on_cpu('biases', [512], tf.constant_initializer(0.1))
-    fc6 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    relu6 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    fc6 = tf.nn.dropout(relu6, dropOut_prob)
     _activation_summary(fc6)
 
   # fc7
@@ -707,7 +733,8 @@ def inference_23(images):
     weights = _variable_with_weight_decay('weights', shape=[dim, 256],
                                           stddev=0.04, wd=0.004)
     biases = _variable_on_cpu('biases', [256], tf.constant_initializer(0.1))
-    fc7 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    relu7 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    fc7 = tf.nn.dropout(relu7, dropOut_prob)
     _activation_summary(fc7)
 
   # fc8
@@ -718,7 +745,8 @@ def inference_23(images):
     weights = _variable_with_weight_decay('weights', shape=[dim, 10],
                                           stddev=0.04, wd=0.004)
     biases = _variable_on_cpu('biases', [10], tf.constant_initializer(0.1))
-    fc8 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    relu8 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    fc8 = tf.nn.dropout(relu8, dropOut_prob)
     _activation_summary(fc8)
 
   # softmax, i.e. softmax(WX + b)
@@ -732,7 +760,85 @@ def inference_23(images):
 
   return softmax_linear
 
+def inference_24(images):
+  """Build the model.
 
+  Args:
+    images: Images returned from distorted_inputs() or inputs().
+
+  Returns:
+    Logits.
+  """
+  # We instantiate all variables using tf.get_variable() instead of
+  # tf.Variable() in order to share variables across multiple GPU training runs.
+  # If we only ran this model on a single GPU, we could simplify this function
+  # by replacing all instances of tf.get_variable() with tf.Variable().
+  #
+  # PAJ: This is the original from the CIFAR-10 tutorial. Expect 84% accuracy after 30k steps on CIFAR-10
+
+  # conv1
+  with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[5, 5, 3, 64],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
+    # batch norm
+    normed = batch_norm(conv, 64, FLAGS.training)
+    conv1 = tf.nn.relu(normed, name=scope.name)
+    _activation_summary(conv1)
+
+  # pool1
+  pool1 = tf.nn.max_pool(conv1, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool1')
+  # norm1
+  norm1 = tf.nn.lrn(pool1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm1')
+
+  # conv2
+  with tf.variable_scope('conv2', reuse=tf.AUTO_REUSE) as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[5, 5, 64, 64],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(norm1, kernel, [1, 1, 1, 1], padding='SAME')
+    # batch norm
+    normed = batch_norm(conv, 64, FLAGS.training)
+    conv2 = tf.nn.relu(normed, name=scope.name)
+    _activation_summary(conv2)
+
+  # norm2
+  norm2 = tf.nn.lrn(conv2, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm2')
+  # pool2
+  pool2 = tf.nn.max_pool(norm2, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME', name='pool2')
+
+  # local3
+  with tf.variable_scope('local3', reuse=tf.AUTO_REUSE) as scope:
+    # Move everything into depth so we can perform a single matrix multiply.
+    reshape = tf.reshape(pool2, [FLAGS.batch_size, -1])
+    dim = reshape.get_shape()[1].value
+    weights = _variable_with_weight_decay('weights', shape=[dim, 384],
+                                          stddev=0.04, wd=0.004)
+    biases = _variable_on_cpu('biases', [384], tf.constant_initializer(0.1))
+    local3 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    _activation_summary(local3)
+
+  # local4
+  with tf.variable_scope('local4', reuse=tf.AUTO_REUSE) as scope:
+    weights = _variable_with_weight_decay('weights', shape=[384, 192],
+                                          stddev=0.04, wd=0.004)
+    biases = _variable_on_cpu('biases', [192], tf.constant_initializer(0.1))
+    local4 = tf.nn.relu(tf.matmul(local3, weights) + biases, name=scope.name)
+    _activation_summary(local4)
+
+  # softmax, i.e. softmax(WX + b)
+  with tf.variable_scope('softmax_linear', reuse=tf.AUTO_REUSE) as scope:
+    weights = _variable_with_weight_decay('weights', [192, NUM_CLASSES],
+                                          stddev=1/192.0, wd=0.0)
+    biases = _variable_on_cpu('biases', [NUM_CLASSES],
+                              tf.constant_initializer(0.0))
+    softmax_linear = tf.add(tf.matmul(local4, weights), biases, name=scope.name)
+    _activation_summary(softmax_linear)
+
+  return softmax_linear
 
 
 

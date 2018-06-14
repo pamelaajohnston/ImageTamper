@@ -54,7 +54,7 @@ tf.app.flags.DEFINE_integer('optimizer', 0, """0 Adam Optimizer, 1 Gradient Desc
 
 #tf.app.flags.DEFINE_string('single_dir', '_yuv', """For defining the single directory """)
 
-def one_eval(scope):
+def one_eval_broken():
     images_test, labels_test = itNet.inputs(eval_data=True)
     logits_test = itNet.inference_switch(images_test, FLAGS.network_architecture)
     top_k_op = tf.nn.in_top_k(logits_test, labels_test, 1)
@@ -66,7 +66,14 @@ def one_eval(scope):
     step = 0
     while step < num_iter:
         print("Step is {}".format(step))
-        predictions = sess.run([top_k_op])
+        print(logits_test)
+        predictions = logits_test
+        batchPredictions = np.asarray(predictions)
+        print("Here's the batch predictions")
+        print(batchPredictions)
+
+        #predictions = sess.run([top_k_op])
+        #predictions = top_k_op
         true_count += np.sum(predictions)
         step += 1
     # Compute precision @ 1.
@@ -74,6 +81,31 @@ def one_eval(scope):
     print('%s: precision @ 1 = %.5f' % (datetime.now(), precision))
     return precision
 
+def one_eval():
+    images_test, labels_test = itNet.inputs(eval_data=True)
+    num_iter = int(FLAGS.num_examples / FLAGS.batch_size)
+    print("Number of iterations = {}".format(num_iter))
+    true_count = 0  # Counts the number of correct predictions.
+    total_sample_count = num_iter * FLAGS.batch_size
+    print("total_sample_count = {}".format(total_sample_count))
+    step = 0
+
+    top_k_op = tf.nn.in_top_k(logits_test, labels_test, 1)
+    while step < num_iter:
+        print("Step is {}".format(step))
+        logits_test = itNet.inference_switch(images_test_batch, FLAGS.network_architecture)
+        print(logits_test)
+        top_k_op = tf.nn.in_top_k(logits_test, labels_test, 1)
+        predictions = top_k_op
+        batchPredictions = np.asarray(predictions)
+        print("Here's the batch predictions")
+        print(batchPredictions)
+        true_count += np.sum(predictions)
+        step += 1
+    # Compute precision @ 1.
+    precision = true_count / total_sample_count
+    print('%s: precision @ 1 = %.5f' % (datetime.now(), precision))
+    return precision
 
 def tower_loss(scope):
   """Calculate the total loss on a single tower running the model.
@@ -216,7 +248,7 @@ def train():
               # Reuse variables for the next tower.
               tf.get_variable_scope().reuse_variables()
 
-              #evilevals = one_eval(scope)
+              #evilevals = one_ eval(scope)
 
               # Retain the summaries from the final tower.
               summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
@@ -313,9 +345,11 @@ def train():
 
       # evaluate on the test data periodically
       #if step % 10 == 0:
-      #  print("Evaluation time......!")
-      #  precision = sess.run(evilevals)
-      #  print('%s: precision @ 1 = %.5f' % (datetime.now(), precision))
+        #print("Evaluation time......!")
+        #precision = sess.run(evilevals)
+        #precision = one_eval(scope, sess)
+        #precision = sess.run(one_eval)
+        #print('%s: precision @ 1 = %.5f' % (datetime.now(), precision))
 
 
 def main_justTheOne(argv=None):  # pylint: disable=unused-argument
@@ -345,6 +379,7 @@ def main_justTheOne(argv=None):  # pylint: disable=unused-argument
     start = datetime.now()
     log.write("Training started at: {} \n".format(start.strftime("%Y-%m-%d %H:%M")))
 
+    itNet.FLAGS.training = 1
     train()
 
     end = datetime.now()
@@ -355,6 +390,7 @@ def main_justTheOne(argv=None):  # pylint: disable=unused-argument
     log.write("Training time: {} minutes {} seconds; which is {} seconds per step\n".format(human_diff[0], human_diff[1], perStep))
 
 
+    itNet.FLAGS.training = 0
     idx = 0
     precision, cm = itNet_eval.evaluate()
     print("The confusion matrix (yay!): \n {}".format(cm))
