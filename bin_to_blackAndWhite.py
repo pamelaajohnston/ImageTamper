@@ -18,11 +18,13 @@ def keep3channels_greyOut(inputFileName, outputFileName, patchWidth=256, patchHe
 
 
     # Black and white it...remember it's been normalised so 128/8!
+    yStart = labelSize
+    uStart = labelSize + (patchHeight*patchWidth)
+    vStart = uStart + (patchHeight*patchWidth)
     newRecordSize = labelSize + (patchHeight*patchWidth)
-    # allTheData[:, newRecordSize:] = 16 # y-only
-    allTheData[:, labelSize:newRecordSize] = 16 # uv-only
-    #allTheData[:, (newRecordSize + (patchWidth * patchHeight)):] = 16 # zero out the v
-    allTheData[:, newRecordSize:(newRecordSize + (patchWidth * patchHeight))] = 16 # zero out the u
+    allTheData[:, yStart:uStart] = 16 # y_channel
+    #allTheData[:, uStart:vStart] = 16 # y_channel
+    allTheData[:, vStart:      ] = 16 # y_channel
 
     datayuv = np.asarray(allTheData, 'u1')
     yuvByteArray = bytearray(datayuv)
@@ -71,5 +73,5 @@ if __name__ == "__main__":
 
     for i, inputFilename in enumerate(inFilenames):
         outputFilename = outFilenames[i]
-        onlyKeepKeptChannels(inputFilename, outputFilename)
+        keep3channels_greyOut(inputFilename, outputFilename)
 
