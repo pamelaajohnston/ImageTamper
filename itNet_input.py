@@ -21,6 +21,7 @@ IMAGE_HEIGHT = 224
 INPUT_IMAGE_SIZE = 256
 INPUT_IMAGE_WIDTH = 256
 INPUT_IMAGE_HEIGHT = 256
+INPUT_IMAGE_CHANNELS = 3
 
 # Number of classes
 NUM_CLASSES = 2
@@ -55,11 +56,11 @@ def read_dataset(filename_queue):
     pass
   result = datasetRecord()
 
-  # 1 byte label followed by all the pixels (3 channels, INPUT_IMAGE_WIDTH by INPUT_IMAGE_HEIGHT
+  # 1 byte label followed by all the pixels (INPUT_IMAGE_CHANNELS, INPUT_IMAGE_WIDTH by INPUT_IMAGE_HEIGHT
   label_bytes = 1
   result.height = INPUT_IMAGE_WIDTH
   result.width = INPUT_IMAGE_HEIGHT
-  result.depth = 3
+  result.depth = INPUT_IMAGE_CHANNELS
   image_bytes = result.height * result.width * result.depth
   # Every record consists of a label followed by the image, with a
   # fixed number of bytes for each.
@@ -108,7 +109,7 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
     shuffle: boolean indicating whether to use a shuffling queue.
 
   Returns:
-    images: Images. 4D tensor of [batch_size, height, width, 3] size.
+    images: Images. 4D tensor of [batch_size, height, width, INPUT_IMAGE_CHANNELS] size.
     labels: Labels. 1D tensor of [batch_size] size.
   """
   # Create a queue that shuffles the examples, and then
@@ -120,14 +121,14 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
         [image, label],
         batch_size=batch_size,
         num_threads=num_preprocess_threads,
-        capacity=min_queue_examples + 3 * batch_size,
+        capacity=min_queue_examples + INPUT_IMAGE_CHANNELS * batch_size,
         min_after_dequeue=min_queue_examples)
   else:
     images, label_batch = tf.train.batch(
         [image, label],
         batch_size=batch_size,
         num_threads=num_preprocess_threads,
-        capacity=min_queue_examples + 3 * batch_size)
+        capacity=min_queue_examples + INPUT_IMAGE_CHANNELS * batch_size)
 
   # Display the training images in the visualizer.
   tf.summary.image('images', images)
@@ -143,7 +144,7 @@ def distorted_inputs(data_dir, batch_size, distort=2):
     batch_size: Number of images per batch.
 
   Returns:
-    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, INPUT_IMAGE_CHANNELS] size.
     labels: Labels. 1D tensor of [batch_size] size.
   """
   # for CIFAR-10
@@ -185,7 +186,7 @@ def distorted_inputs(data_dir, batch_size, distort=2):
 
   if distort == 1:
     # Randomly crop a [height, width] section of the image.
-    distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
+    distorted_image = tf.random_crop(reshaped_image, [height, width, INPUT_IMAGE_CHANNELS])
 
     # Randomly flip the image horizontally.
     distorted_image = tf.image.random_flip_left_right(distorted_image)
@@ -195,7 +196,7 @@ def distorted_inputs(data_dir, batch_size, distort=2):
     distorted_image = tf.image.random_brightness(distorted_image, max_delta=63)
     distorted_image = tf.image.random_contrast(distorted_image, lower=0.2, upper=1.8)
   elif distort == 2:
-    distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
+    distorted_image = tf.random_crop(reshaped_image, [height, width, INPUT_IMAGE_CHANNELS])
 
   else:
     distorted_image = tf.image.resize_image_with_crop_or_pad(reshaped_image, width, height)
@@ -224,7 +225,7 @@ def inputs(eval_data, data_dir, batch_size):
     batch_size: Number of images per batch.
 
   Returns:
-    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, INPUT_IMAGE_CHANNELS] size.
     labels: Labels. 1D tensor of [batch_size] size.
   """
   if not eval_data:

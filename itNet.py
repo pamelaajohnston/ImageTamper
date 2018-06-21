@@ -51,6 +51,7 @@ tf.app.flags.DEFINE_integer('training', 1, """Training cycle""")
 
 # Global constants describing the data set.
 IMAGE_SIZE = itNet_input.IMAGE_SIZE
+INPUT_IMAGE_CHANNELS = itNet_input.INPUT_IMAGE_CHANNELS
 NUM_CLASSES = itNet_input.NUM_CLASSES
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = itNet_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = itNet_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
@@ -245,7 +246,7 @@ def inputs(eval_data):
     eval_data: bool, indicating if one should use the train or eval data set.
 
   Returns:
-    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 3] size.
+    images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, INPUT_IMAGE_CHANNELS] size.
     labels: Labels. 1D tensor of [batch_size] size.
 
   Raises:
@@ -358,7 +359,7 @@ def inference(images):
   # conv1
   with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -442,7 +443,7 @@ def inference_2(images):
   # conv1
   with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[7, 7, 3, 96],
+                                         shape=[7, 7, INPUT_IMAGE_CHANNELS, 96],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -614,7 +615,7 @@ def inference_23(images, dropOut_prob = 1.0, batchNorm = False):
   # conv1
   with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[7, 7, 3, 96],
+                                         shape=[7, 7, INPUT_IMAGE_CHANNELS, 96],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -779,7 +780,7 @@ def inference_24(images):
   # conv1
   with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -861,7 +862,7 @@ def inference_3(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -1002,7 +1003,7 @@ def inference_4(images, input):
   with tf.variable_scope('conv1') as scope:
     print("Initialising the network with kernels")
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0,
                                          verbose=True,
@@ -1106,7 +1107,7 @@ def inference_5(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[3, 3, 3, 64],
+                                         shape=[3, 3, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -1212,7 +1213,7 @@ def inference_6(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 160],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 160],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 1, 1, 1], padding='SAME')
@@ -1296,7 +1297,7 @@ def inference_7(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[9, 9, 3, 64],
+                                         shape=[9, 9, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 8, 8, 1], padding='SAME')
@@ -1376,7 +1377,7 @@ def inference_8(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[4, 4, 3, 64],
+                                         shape=[4, 4, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -1456,7 +1457,7 @@ def inference_9(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[18, 18, 3, 64],
+                                         shape=[18, 18, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 16, 16, 1], padding='SAME')
@@ -1536,7 +1537,7 @@ def inference_10(images, dropOut_prob = 1.0):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -1618,7 +1619,7 @@ def inference_11(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[4, 4, 3, 64],
+                                         shape=[4, 4, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -1725,7 +1726,7 @@ def inference_12(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[4, 4, 3, 64],
+                                         shape=[4, 4, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -1830,7 +1831,7 @@ def inference_13(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[4, 4, 3, 64],
+                                         shape=[4, 4, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -1936,7 +1937,7 @@ def inference_14(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -2005,7 +2006,7 @@ def inference_15(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -2086,7 +2087,7 @@ def inference_16(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 4, 4, 1], padding='SAME')
@@ -2166,7 +2167,7 @@ def inference_17(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -2236,7 +2237,7 @@ def inference_18(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 3, 64],
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 64],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
@@ -2329,7 +2330,7 @@ def inference_19(images):
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[3, 3, 3, 32],
+                                         shape=[3, 3, INPUT_IMAGE_CHANNELS, 32],
                                          stddev=5e-2,
                                          wd=0.0)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='SAME')
