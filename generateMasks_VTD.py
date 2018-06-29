@@ -21,7 +21,7 @@ import functions
 
 VTD_32thresholders = ["studio", "swann", "swimming", "whitecar", "yellowcar"]
 VTD_24thresholders = ["archery"]
-VTD_16thresholders = ["bowling", "bullet", "passport", "plane"]
+VTD_16thresholders = ["bowling", "bullet", "passport", "plane", "highway"]
 
 if __name__ == "__main__":
     myDir = '/Users/pam/Documents/data/VTD_yuv'

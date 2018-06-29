@@ -64,7 +64,6 @@ if __name__ == "__main__":
     labelSize = 1
 
     inDir = '/Volumes/LaCie/data/CASIA2/patches_CASIA2'
-    outDir = '/Volumes/LaCie/data/CASIA2/patches_CASIA2_colourOnly'
 
     inFilenames =  glob(inDir + os.sep + '*' + '.bin')
 

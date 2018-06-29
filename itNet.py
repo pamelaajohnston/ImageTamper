@@ -332,7 +332,7 @@ def inference_switch(images, type=1):
     elif type == 22:
         return inference_10(images, 0.2)
     elif type == 23:
-        dropout_rate = 0.8
+        dropout_rate = 0.5
         if FLAGS.training:
             dropout_rate = 1.0
         return inference_23(images, dropout_rate)
