@@ -2500,7 +2500,9 @@ def inference_25(images, dropOut_prob = 1.0):
     Logits.
   """
   # PAJ: this is from the paper A deep learning approach to detection of splicing and copy-move forgeries in images
-  # by Rao and Ni who claim SOTA for CASIA2 of >97% but they've randomised their dataset (so train/test are not disjoint)
+  # By Nao and Ri at WIFS who used CASIA 2 and claim
+  # 97 percent but they've randomised their dataset
+  # (so train and test are not disjoint)
 
   # conv1
   with tf.variable_scope('conv1') as scope:
@@ -2626,7 +2628,7 @@ def inference_25(images, dropOut_prob = 1.0):
   # softmax, i.e. softmax(WX + b)
   with tf.variable_scope('softmax_linear') as scope:
     weights = _variable_with_weight_decay('weights', [2, NUM_CLASSES],
-                                          stddev=1/192.0, wd=0.0)
+                                          stddev=1/2.0, wd=0.0)
     biases = _variable_on_cpu('biases', [NUM_CLASSES],
                               tf.constant_initializer(0.0))
     softmax_linear = tf.add(tf.matmul(local11, weights), biases, name=scope.name)
