@@ -332,12 +332,17 @@ def inference_switch(images, type=1):
     elif type == 22:
         return inference_10(images, 0.2)
     elif type == 23:
-        dropout_rate = 0.5
+        dropout_rate = 0.8
         if FLAGS.training:
             dropout_rate = 1.0
         return inference_23(images, dropout_rate)
     elif type == 24:
         return inference_24(images)
+    elif type == 25:
+        dropout_rate = 0.8
+        if FLAGS.training:
+            dropout_rate = 1.0
+        return inference_25(images, dropout_rate)
 
 
 def inference(images):
@@ -770,12 +775,7 @@ def inference_24(images):
   Returns:
     Logits.
   """
-  # We instantiate all variables using tf.get_variable() instead of
-  # tf.Variable() in order to share variables across multiple GPU training runs.
-  # If we only ran this model on a single GPU, we could simplify this function
-  # by replacing all instances of tf.get_variable() with tf.Variable().
-  #
-  # PAJ: This is the original from the CIFAR-10 tutorial. Expect 84% accuracy after 30k steps on CIFAR-10
+  # PAJ: A short network with batch normalization, but I can't make it work/save batch norm weights.
 
   # conv1
   with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
@@ -2490,6 +2490,149 @@ def inference_19(images):
 
   return softmax_linear
 
+def inference_25(images, dropOut_prob = 1.0):
+  """Build the model.
+
+  Args:
+    images: Images returned from distorted_inputs() or inputs().
+
+  Returns:
+    Logits.
+  """
+  # PAJ: this is from the paper A deep learning approach to detection of splicing and copy-move forgeries in images
+  # by Rao and Ni who claim SOTA for CASIA2 of >97% but they've randomised their dataset (so train/test are not disjoint)
+
+  # conv1
+  with tf.variable_scope('conv1') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[5, 5, INPUT_IMAGE_CHANNELS, 30],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [30], tf.constant_initializer(0.0))
+    bias = tf.nn.bias_add(conv, biases)
+    conv1 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv1)
+
+  # (conv2) layer 2
+  # norm1
+  norm2 = tf.nn.lrn(conv1, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm2')
+  # pool2
+  pool2 = tf.nn.max_pool(norm2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID', name='pool2')
+
+  # conv3 because the paper gives the mp layer a number
+  with tf.variable_scope('conv3') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 30, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv3 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv3)
+
+  # conv4 because the paper gives the mp layer a number
+  with tf.variable_scope('conv4') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 16, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv3, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv4 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv4)
+
+  # conv5 because the paper gives the mp layer a number
+  with tf.variable_scope('conv5') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 16, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv4, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv5 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv5)
+
+  # (conv6) layer 6
+  # norm1
+  norm6 = tf.nn.lrn(conv5, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name='norm6')
+  # pool2
+  pool6 = tf.nn.max_pool(norm6, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID', name='pool6')
+
+  # conv7 because the paper gives the mp layer a number
+  with tf.variable_scope('conv7') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 16, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(pool6, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv7 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv7)
+
+  # conv8 because the paper gives the mp layer a number
+  with tf.variable_scope('conv8') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 16, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv7, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv8 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv8)
+
+  # conv9 because the paper gives the mp layer a number
+  with tf.variable_scope('conv9') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 16, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv8, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv9 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv9)
+
+  # conv10 because the paper gives the mp layer a number
+  with tf.variable_scope('conv10') as scope:
+    kernel = _variable_with_weight_decay('weights',
+                                         shape=[3, 3, 16, 16],
+                                         stddev=5e-2,
+                                         wd=0.0)
+    conv = tf.nn.conv2d(conv9, kernel, [1, 1, 1, 1], padding='VALID')
+    biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
+    bias = tf.nn.bias_add(conv, biases)
+    conv10 = tf.nn.relu(bias, name=scope.name)
+    _activation_summary(conv10)
+
+
+  # "Output
+  with tf.variable_scope('local11') as scope:
+    # Move everything into depth so we can perform a single matrix multiply.
+    reshape = tf.reshape(conv10, [FLAGS.batch_size, -1])
+    dim = reshape.get_shape()[1].value
+    weights = _variable_with_weight_decay('weights', shape=[dim, 2],
+                                          stddev=0.04, wd=0.004)
+    biases = _variable_on_cpu('biases', [2], tf.constant_initializer(0.1))
+    relu11 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+    local11 = tf.nn.dropout(relu11, dropOut_prob)
+    _activation_summary(local11)
+
+  # softmax, i.e. softmax(WX + b)
+  with tf.variable_scope('softmax_linear') as scope:
+    weights = _variable_with_weight_decay('weights', [2, NUM_CLASSES],
+                                          stddev=1/192.0, wd=0.0)
+    biases = _variable_on_cpu('biases', [NUM_CLASSES],
+                              tf.constant_initializer(0.0))
+    softmax_linear = tf.add(tf.matmul(local11, weights), biases, name=scope.name)
+    _activation_summary(softmax_linear)
+
+  return softmax_linear
 
 
 
