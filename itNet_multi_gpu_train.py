@@ -221,7 +221,7 @@ def train():
     ###Alternative learning rate
     boundaries = [4000.0, 5000.0]
     values = [0.1, 0.025, 0.0125]
-    lr = tf.train.piecewise_constant(global_step, boundaries, values)
+    #lr = tf.train.piecewise_constant(global_step, boundaries, values)
 
     # Create an optimizer that performs gradient descent.
     if FLAGS.optimizer == 0:

@@ -64,6 +64,11 @@ NUM_EPOCHS_PER_DECAY = 350.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.5  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 
+# For Nao and Ri
+NUM_EPOCHS_PER_DECAY = 10.0      # Epochs after which learning rate decays.
+LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
+INITIAL_LEARNING_RATE = 0.01       # Initial learning rate.
+
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
@@ -339,7 +344,7 @@ def inference_switch(images, type=1):
     elif type == 24:
         return inference_24(images)
     elif type == 25:
-        dropout_rate = 0.8
+        dropout_rate = 0.5
         if FLAGS.training:
             dropout_rate = 1.0
         return inference_25(images, dropout_rate)
@@ -2504,12 +2509,14 @@ def inference_25(images, dropOut_prob = 1.0):
   # 97 percent but they've randomised their dataset
   # (so train and test are not disjoint)
 
+  weightdecay = 0.0001
+
   # conv1
   with tf.variable_scope('conv1') as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[5, 5, INPUT_IMAGE_CHANNELS, 30],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(images, kernel, [1, 2, 2, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [30], tf.constant_initializer(0.0))
     bias = tf.nn.bias_add(conv, biases)
@@ -2527,7 +2534,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 30, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2539,7 +2546,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 16, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(conv3, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2551,7 +2558,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 16, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(conv4, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2569,7 +2576,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 16, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(pool6, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2581,7 +2588,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 16, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(conv7, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2593,7 +2600,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 16, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(conv8, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2605,7 +2612,7 @@ def inference_25(images, dropOut_prob = 1.0):
     kernel = _variable_with_weight_decay('weights',
                                          shape=[3, 3, 16, 16],
                                          stddev=5e-2,
-                                         wd=0.0)
+                                         wd=weightdecay)
     conv = tf.nn.conv2d(conv9, kernel, [1, 1, 1, 1], padding='VALID')
     biases = _variable_on_cpu('biases', [16], tf.constant_initializer(0.1))
     bias = tf.nn.bias_add(conv, biases)
@@ -2613,25 +2620,16 @@ def inference_25(images, dropOut_prob = 1.0):
     _activation_summary(conv10)
 
 
-  # "Output
-  with tf.variable_scope('local11') as scope:
-    # Move everything into depth so we can perform a single matrix multiply.
-    reshape = tf.reshape(conv10, [FLAGS.batch_size, -1])
-    dim = reshape.get_shape()[1].value
-    weights = _variable_with_weight_decay('weights', shape=[dim, 2],
-                                          stddev=0.04, wd=0.004)
-    biases = _variable_on_cpu('biases', [2], tf.constant_initializer(0.1))
-    relu11 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
-    local11 = tf.nn.dropout(relu11, dropOut_prob)
-    _activation_summary(local11)
-
+  # "Output"
   # softmax, i.e. softmax(WX + b)
   with tf.variable_scope('softmax_linear') as scope:
-    weights = _variable_with_weight_decay('weights', [2, NUM_CLASSES],
-                                          stddev=1/2.0, wd=0.0)
+    reshape = tf.reshape(conv10, [FLAGS.batch_size, -1])
+    dim = reshape.get_shape()[1].value
+    weights = _variable_with_weight_decay('weights', [dim, NUM_CLASSES],
+                                          stddev=1/2.0, wd=weightdecay)
     biases = _variable_on_cpu('biases', [NUM_CLASSES],
                               tf.constant_initializer(0.0))
-    softmax_linear = tf.add(tf.matmul(local11, weights), biases, name=scope.name)
+    softmax_linear = tf.add(tf.matmul(reshape, weights), biases, name=scope.name)
     _activation_summary(softmax_linear)
 
   return softmax_linear
