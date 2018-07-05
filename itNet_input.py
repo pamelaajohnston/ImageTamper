@@ -18,16 +18,29 @@ import tensorflow as tf
 IMAGE_SIZE = 224
 IMAGE_WIDTH = 224
 IMAGE_HEIGHT = 224
-INPUT_IMAGE_SIZE = 256
-INPUT_IMAGE_WIDTH = 256
-INPUT_IMAGE_HEIGHT = 256
+INPUT_IMAGE_SIZE = 128
+INPUT_IMAGE_WIDTH = 128
+INPUT_IMAGE_HEIGHT = 128
 INPUT_IMAGE_CHANNELS = 3
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 15782 # CASIA2
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 1950
+
+
+# 128 patch dataset
+IMAGE_SIZE = 224
+IMAGE_WIDTH = 224
+IMAGE_HEIGHT = 224
+INPUT_IMAGE_SIZE = 128
+INPUT_IMAGE_WIDTH = 128
+INPUT_IMAGE_HEIGHT = 128
+INPUT_IMAGE_CHANNELS = 3
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 25782 # CASIA2
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 3102
+
 
 # Number of classes
 NUM_CLASSES = 2
 # This is the number of training examples in the dataset - one epoch runs over all the examples
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 15782 # CASIA2
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 1950
 
 
 def read_dataset(filename_queue):
@@ -232,6 +245,7 @@ def inputs(eval_data, data_dir, batch_size):
     #filenames = [os.path.join(data_dir, 'patches_%d.bin' % i) for i in xrange(0, 8)] # original based on CIF vid
     filenames = [os.path.join(data_dir, 'patches_train_%d.bin' % i) for i in xrange(0, 1)]
     filenames = [os.path.join(data_dir, 'train_crop.bin')]
+    # For CASIA2 256x256 patches and 128x128 patches
     filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
   else:

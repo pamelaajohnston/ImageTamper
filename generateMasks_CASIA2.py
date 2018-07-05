@@ -7,6 +7,7 @@ import numpy as np
 import random
 import shutil
 import cv2 as cv
+import math
 #import sys
 #sys.path.append('/Users/pam/Documents/dev/git/cifar10/')
 import functions
@@ -93,13 +94,15 @@ def splice_save(Au_pic, backgrounds, save_dir):
 
 if __name__ == "__main__":
     myDir = '/Volumes/LaCie/data/CASIA2/test'
-    cropDir = 'test_crop'
+    cropDir = 'test_crop_128'
+    myDir = '/Volumes/LaCie/data/CASIA2/train'
+    cropDir = 'train_crop_128'
     #myDir = 'train'
     #cropDir = 'train_crop'
-    cropDim = 256
+    cropDim = 128
     cropStep = 64
 
-    shuffled = False
+    shuffled = True
 
     datasetName = "{}.bin".format(cropDir)
     if shuffled == False:
@@ -262,6 +265,13 @@ if __name__ == "__main__":
 
     totTamperedPatches = len(datasetList)
 
+    totAuthPics = len(Au_pic_list)
+    cropsPerAuthPic = int(math.ceil(float(totTamperedPatches) / float(totAuthPics)))
+    print("There are {} tampered patches, {} authentic files so {} crops per auth file".format(totTamperedPatches, totAuthPics, cropsPerAuthPic))
+
+    if cropsPerAuthPic == 0:
+        cropsPerAuthPic = 1
+
     for Au_pic in Au_pic_list:
         print("Authentic: {} ".format(Au_pic))
         au_image = plt.imread(Au_pic)
@@ -278,29 +288,49 @@ if __name__ == "__main__":
         patchNo = 0
         #NOTE: using cropDim rather than cropStep to reduce the number of patches from auth files and
         # try to balance the dataset a little better.
-        for cSx in range(0, w-cropDim+1, cropDim):
-            for cSy in range(0, h-cropDim+1, cropDim):
-                n = "{}_{}.png".format(basename, patchNo)
-                cropName = os.path.join(cropDir, n)
-                croppedImg = au_image[cSy:(cropDim + cSy), cSx:(cropDim + cSx), :]
-                plt.imsave(cropName, croppedImg)
-                unshuffledNames.append(cropName)
-                # convert to YUV444 because that's my thing
-                croppedImg = np.swapaxes(croppedImg, 1,2)
-                croppedImg = np.swapaxes(croppedImg, 0,1)
-                datargb = croppedImg.flatten()
-                datayuv = functions.planarRGB_2_planarYUV(datargb, 256, 256)
-                label = 0
-                datayuv = np.divide(datayuv, 8) # normalise
-                datayuv = np.concatenate((np.array([label]), datayuv), axis=0)
-                datayuv = datayuv.flatten()
-                datasetList.append(datayuv)
-                numPatches = numPatches + 1
-                patchNo = patchNo + 1
+        xStride = cropDim
+        yStride = cropDim
+        xStart = 0
+        yStart = 0
+        xEnd = w-xStride
+        yEnd = h-yStride
+
+        # A balanced dataset with a wide variety of images, random crop
+
+        #for cSx in range(xStart, xEnd, xStride):
+        #    for cSy in range(yStart, yEnd, yStride):
+
+        cSx = (w // 2) - (cropDim // 2)
+        cSy = (h // 2) - (cropDim // 2)
+        cosList = [(cSx, cSy),]
+        for z in range(1, cropsPerAuthPic):
+            cSx = random.randint(xStart, xEnd)
+            cSy = random.randint(yStart, yEnd)
+            co = (cSx, cSy)
+            cosList.append(co)
+
+        for (cSx,cSy) in cosList:
+            n = "{}_{}.png".format(basename, patchNo)
+            cropName = os.path.join(cropDir, n)
+            croppedImg = au_image[cSy:(cropDim + cSy), cSx:(cropDim + cSx), :]
+            plt.imsave(cropName, croppedImg)
+            unshuffledNames.append(cropName)
+            # convert to YUV444 because that's my thing
+            croppedImg = np.swapaxes(croppedImg, 1,2)
+            croppedImg = np.swapaxes(croppedImg, 0,1)
+            datargb = croppedImg.flatten()
+            datayuv = functions.planarRGB_2_planarYUV(datargb, cropDim, cropDim)
+            label = 0
+            datayuv = np.divide(datayuv, 8) # normalise
+            datayuv = np.concatenate((np.array([label]), datayuv), axis=0)
+            datayuv = datayuv.flatten()
+            datasetList.append(datayuv)
+            numPatches = numPatches + 1
+            patchNo = patchNo + 1
 
         #quit()
     totPatches = len(datasetList)
-    print("TotalPatches: {}, tampered patches: {}".format(totPatches, totTamperedPatches))
+    print("TotalPatches: {}, tampered patches: {}, we took {} patches from each auth file".format(totPatches, totTamperedPatches, cropsPerAuthPic))
     print("failed list {}".format(failedList))
     dataset_array = np.array(datasetList)
     print("Size of Dataset: {}".format(dataset_array.shape))
