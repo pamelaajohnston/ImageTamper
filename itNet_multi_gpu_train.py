@@ -286,7 +286,7 @@ def train():
     train_op = tf.group(apply_gradient_op, variables_averages_op)
 
     # Create a saver (which is deprecated in version 1.4)
-    saver = tf.train.Saver(tf.global_variables(), max_to_keep=2)
+    saver = tf.train.Saver(tf.global_variables(), max_to_keep=4)
 
     # Build the summary operation from the last tower summaries.
     summary_op = tf.summary.merge(summaries)
@@ -339,7 +339,7 @@ def train():
         summary_writer.add_summary(summary_str, step)
 
       # Save the model checkpoint periodically.
-      if step % 100 == 0 or (step + 1) == FLAGS.max_steps:
+      if step % 10000 == 0 or (step + 1) == FLAGS.max_steps:
         checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
         saver.save(sess, checkpoint_path, global_step=step)
 

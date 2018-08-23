@@ -304,7 +304,7 @@ def evaluate(returnConfusionMatrix=True):
             cmString = cmString.replace(']', '')
             log.write('confusionMatrix: \n {} \n'.format(cmString))
 
-            log.write("******************************************************* \n")
+            #log.write("******************************************************* \n")
             log.flush()
             runtimes = runtimes + 1
             #print("The number of times run: {} out of {}".format(runtimes, FLAGS.run_times))

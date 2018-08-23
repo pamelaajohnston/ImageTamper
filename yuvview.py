@@ -15,7 +15,7 @@ from ssim.ssimlib import get_gaussian_kernel
 from ssim.compat import Image
 
 
-def yuvFileTobmpFile (yuvFileName, width, height, framenum, format, bmpFileName):
+def yuvFileTobmpFile (yuvFileName, width, height, framenum, format, bmpFileName, bw=False):
     y = array.array('B')
     u = array.array('B')
     v = array.array('B')
@@ -57,6 +57,9 @@ def yuvFileTobmpFile (yuvFileName, width, height, framenum, format, bmpFileName)
             Y_val = y[(i*width)+j]
             U_val = u[((i/2)*(width/2))+(j/2)]
             V_val = v[((i/2)*(width/2))+(j/2)]
+            if bw:
+                U_val = 128
+                V_val = 128
             #B = 1.164 * (Y_val-16) + 2.018 * (U_val - 128)
             #G = 1.164 * (Y_val-16) - 0.813 * (V_val - 128) - 0.391 * (U_val - 128)
             #R = 1.164 * (Y_val-16) + 1.596*(V_val - 128)

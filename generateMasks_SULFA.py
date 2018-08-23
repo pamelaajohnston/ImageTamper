@@ -10,6 +10,7 @@ import cv2 as cv
 #import sys
 #sys.path.append('/Users/pam/Documents/dev/git/cifar10/')
 import functions
+import patchIt
 
 
 
@@ -24,7 +25,7 @@ VTD_24thresholders = ["archery"]
 VTD_16thresholders = ["bowling", "bullet", "passport", "plane", "highway"]
 
 if __name__ == "__main__":
-    myDir = '/Users/pam/Documents/data/VTD_yuv'
+    myDir = '/Users/pam/Documents/data/SULFA_yuv'
     height = 720
     width = 1280
     num_channels = 3
@@ -55,32 +56,13 @@ if __name__ == "__main__":
         Mask_vid = Tp_vid.replace("_f.yuv","_mask.yuv")
         print("Authentic vid: {} tampered vid: {}".format(Au_vid, Tp_vid))
 
-        # Stoopid special case:
-        if "audirs7" in Tp_vid:
-            width = 854
-            height = 480
-        else:
-            width = 1280
-            height = 720
+        width, height, firstTampFrame, interFrameOnly = patchIt.getFrameDetailsFromFilename(Tp_vid)
 
         frameSize = width * height * 3 // 2
         diffthresh = 64 # try 64 for the first bit
 
         # Visual inspection gave this
-        for name in VTD_32thresholders:
-            if name in Tp_vid:
-                diffthresh = 32
-                break
-
-        for name in VTD_24thresholders:
-            if name in Tp_vid:
-                diffthresh = 24
-                break
-
-        for name in VTD_16thresholders:
-            if name in Tp_vid:
-                diffthresh = 16
-                break
+        diffthresh = patchIt.getManuallyEstimatedTamperingThreshold(Tp_vid)
 
         with open(Au_vid, "rb") as f:
             Au_vid_bytes = np.fromfile(f, 'u1')

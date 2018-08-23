@@ -11,46 +11,69 @@ import cv2 as cv
 #sys.path.append('/Users/pam/Documents/dev/git/cifar10/')
 import functions
 
-# dataset, yuv420 filename, width, height, tamper start frame, tamper end frame
+# dataset, yuv420 filename, width, height, tamper start frame, tamper end frame, threshold for tampering
 tvd_dataset = 0
 tvd_filename = 1
 tvd_width = 2
 tvd_height = 3
 tvd_firstTframe = 4
 tvd_lastTframe = 5
-tvd_diffthresh = 6
+tvd_diffthresh = 6 # This is for the difference threshold that silences most noise, manually estimated with yuvdiff
+tvd_spatialOrNot = 7 # This is for whether or not the difference is spatial or temporal (i.e. intra (0) or inter (1) frame)
 tampered_video_data=[
-    ["VTD",     "archery",     1280, 720, 236, 278,  28],
-    ["VTD",     "audirs7",      854, 480, 25,   81, 32],
-    ["VTD",     "basketball",  1280, 720, 0,   450, 64],
-    ["VTD",     "billiards",   1280, 720, 0,   420, 64],
-    ["VTD",     "bowling",     1280, 720, 0, 434, 16],
-    ["VTD",     "bullet",      1280, 720, 3, 301, 16],
-    ["VTD",     "cake",        1280, 720, 160, 299, 64],
-    ["VTD",     "camera",      1280, 720, 0, 188, 64],
-    ["VTD",     "carpark",     1280, 720, 0, 450, 64],
-    ["VTD",     "carplate",    1280, 720, 180, 212, 64],
-    ["VTD",     "cctv",        1280, 720, 384, 420, 64],
-    ["VTD",     "clarity",     1280, 720, 370, 450, 64],
-    ["VTD",     "cuponk",      1280, 720, 49, 96, 64],
-    ["VTD",     "dahua",       1280, 720, 0, 420, 64],
-    ["VTD",     "football",    1280, 720, 0, 143, 64],
-    ["VTD",     "highway",     1280, 720, 48, 235, 64],
-    ["VTD",     "kitchen",     1280, 720, 0, 94, 64],
-    ["VTD",     "manstreet",   1280, 720, 0, 111, 64],
-    ["VTD",     "passport",    1280, 720, 59, 296, 16],
-    ["VTD",     "plane",       1280, 720, 0, 38, 16],
-    ["VTD",     "pong",        1280, 720, 0, 100, 32], # unknown, messy sequence
-    ["VTD",     "studio",      1280, 720, 0, 68, 32],
-    ["VTD",     "swann",       1280, 720, 0, 122, 32],
-    ["VTD",     "swimming",    1280, 720, 361, 422, 32],
-    ["VTD",     "whitecar",    1280, 720, 245, 333, 32],
-    ["VTD",     "yellowcar",   1280, 720, 0, 100, 32] # unknown, messy sequence
+    ["VTD",     "archery",     1280, 720, 236,  278,    28, 0],
+    ["VTD",     "audirs7",      854, 480, 25,    81,    32, 1],
+    ["VTD",     "basketball",  1280, 720, 0,    450,    64, 0],
+    ["VTD",     "billiards",   1280, 720, 0,    420,    64, 0],
+    ["VTD",     "bowling",     1280, 720, 0,    434,    16, 0],
+    ["VTD",     "bullet",      1280, 720, 3,    301,    16, 1],
+    ["VTD",     "cake",        1280, 720, 160,  299,    64, 0],
+    ["VTD",     "camera",      1280, 720, 0,    188,    64, 0],
+    ["VTD",     "carpark",     1280, 720, 0,    450,    64, 0],
+    ["VTD",     "carplate",    1280, 720, 180,  212,    64, 0],
+    ["VTD",     "cctv",        1280, 720, 384,  420,    64, 0],
+    ["VTD",     "clarity",     1280, 720, 370,  450,    64, 0],
+    ["VTD",     "cuponk",      1280, 720, 49,   96,     64, 1],
+    ["VTD",     "dahua",       1280, 720, 0,    420,    64, 0],
+    ["VTD",     "football",    1280, 720, 0,    143,    64, 0],
+    ["VTD",     "highway",     1280, 720, 48,   235,    64, 0],
+    ["VTD",     "kitchen",     1280, 720, 0,    94,     64, 0],
+    ["VTD",     "manstreet",   1280, 720, 0,    111,    64, 0],
+    ["VTD",     "passport",    1280, 720, 59,   296,    16, 0],
+    ["VTD",     "plane",       1280, 720, 0,    38,     16, 0],
+    ["VTD",     "pong",        1280, 720, 0,    100,    32, 1], # unknown, messy sequence
+    ["VTD",     "studio",      1280, 720, 0,    68,     32, 0],
+    ["VTD",     "swann",       1280, 720, 0,    122,    32, 0],
+    ["VTD",     "swimming",    1280, 720, 361,  422,    32, 0],
+    ["VTD",     "whitecar",    1280, 720, 245,  333,    32, 0],
+    ["VTD",     "yellowcar",   1280, 720, 0,    100,    32, 1], # unknown, messy sequence
+    ["SULFA",   "01",           320, 240, 0,    209,     0, 0], # SULFA *looks* like frame shuffling but it's all copy-move
+    ["SULFA",   "02",           320, 240, 114,  161,     0, 0],
+    ["SULFA",   "03",           320, 240, 231,  312,     0, 0],
+    ["SULFA",   "04",           320, 240, 60,   122,     0, 0],
+    ["SULFA",   "05",           320, 240, 0,    189,     0, 0],
+    ["SULFA",   "06",           320, 240, 206,  261,     0, 0],
+    ["SULFA",   "07",           320, 240, 0,    128,     0, 0],
+    ["SULFA",   "08",           320, 240, 129,  161,     0, 0],
+    ["SULFA",   "09",           320, 240, 152,  362,     0, 0],
+    ["SULFA",   "10",           320, 240, 93,   157,     0, 0],
+    ["Davino",  "01_TANK",      1280,720, 3,    194,     8, 0],
+    ["Davino",  "02_MAN",       1280,720, 0,    205,     0, 0],
+    ["Davino",  "03_CAT",       1280,720, 146,  216,     0, 0],
+    ["Davino",  "04_HELICOPTER",1280, 720,196,  487,     0, 0],
+    ["Davino",  "05_HEN",       1280, 720,  0,  167,     0, 0],
+    ["Davino",  "06_LION",      1280, 720, 58,  293,     0, 0],
+    ["Davino",  "07_UFO",       1280, 720,203,  298,     0, 0],
+    ["Davino",  "08_TREE",      1280, 720,  0,  244,     0, 0],
+    ["Davino",  "09_GIRL",      1280, 720,207,  370,     0, 0],
+    ["Davino",  "10_DOG",       1280, 720,  0,  185,     0, 0],
 ]
 
 
 dataset_paths=[
-    ["VTD", "/Users/pam/Documents/data/VTD_yuv"]
+    ["VTD", "/Users/pam/Documents/data/VTD_yuv"],
+    ["SULFA", "/Users/pam/Documents/data/SULFA_yuv"],
+    ["DAVINO", "/Users/pam/Documents/data/DAVINO_yuv"],
 ]
 
 # Assumes YUV planar patches (or planar patches at any rate), so channel, height, width order.
@@ -91,27 +114,47 @@ def makePatchLabels(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channels):
     return labels_array
 
 def getFrameDetailsFromFilename(filename):
-    b, e = os.path.splitext(Tp_vid)
+    b, e = os.path.splitext(filename)
     p, b = os.path.split(b)
     p, f = os.path.split(p)
 
     width = 0
     height = 0
     firstTampFrame = 0
+    interFrameOnly = 0
     #print("Folder: {}, file: {}, ext: {}".format(f, b, e))
 
     for entry in tampered_video_data:
-        #print("searching for {} and {} ".format(entry[tvd_dataset], entry[tvd_filename]))
+        #print("searching for {} and {} cf {} \n".format(entry[tvd_dataset], entry[tvd_filename], f))
         if entry[tvd_dataset] in f:
             if entry[tvd_filename] in b:
                 width = entry[tvd_width]
                 height = entry[tvd_height]
                 firstTampFrame = entry[tvd_firstTframe]
+                interFrameOnly = entry[tvd_spatialOrNot]
                 break
 
     #print("Folder: {}, file: {}, ext: {}".format(f, b, e))
     #print("Read width: {}, height: {}, t: {}".format(width, height, firstTampFrame))
-    return width, height, firstTampFrame
+    return width, height, firstTampFrame, interFrameOnly
+
+def getManuallyEstimatedTamperingThreshold(filename):
+    b, e = os.path.splitext(filename)
+    p, b = os.path.split(b)
+    p, f = os.path.split(p)
+
+    threshold = 0
+
+    for entry in tampered_video_data:
+        #print("searching for {} and {} ".format(entry[tvd_dataset], entry[tvd_filename]))
+        if entry[tvd_dataset] in f:
+            if entry[tvd_filename] in b:
+                threshold = entry[tvd_diffthresh]
+                break
+
+    #print("Folder: {}, file: {}, ext: {}".format(f, b, e))
+    #print("Read width: {}, height: {}, t: {}".format(width, height, firstTampFrame))
+    return threshold
 
 def findTamperedRoiFromMask(mask, width, height, frameSize):
     numFrames = len(mask) // frameSize
@@ -129,11 +172,12 @@ def findTamperedRoiFromMask(mask, width, height, frameSize):
 
 
 if __name__ == "__main__":
-    myDir = '/Users/pam/Documents/data/VTD_yuv'
-    cropDir = 'test_crop_vtd'
+    dirs = ['/Users/pam/Documents/data/Davino_yuv','/Users/pam/Documents/data/VTD_yuv']
+    myDir = '/Users/pam/Documents/data/SULFA_yuv'
+    cropDir = 'test_crop_sulfa_128_no_temp'
     height = 720
     width = 1280
-    cropDim = 256
+    cropDim = 128
     cropStep = 48
     num_channels = 3
     bit_depth = 8 # please remember to normalise
@@ -154,11 +198,19 @@ if __name__ == "__main__":
     failedList = []
 
     Tp_vid_list = glob(myDir + os.sep + '*' + '_f.yuv')
-    Au_vid_list = glob(myDir + os.sep + '*' + '_r.yuv')
+    #for dir in dirs:
+    #    Tp_vid_list += glob(dir + os.sep + '*' + '_f.yuv')
+    #Au_vid_list = glob(myDir + os.sep + '*' + '_r.yuv')
+
+    #print(Tp_vid_list)
+    #quit()
 
     for Tp_vid in Tp_vid_list:
         print("The file is {}".format(Tp_vid))
-        width, height, firstTamp1 = getFrameDetailsFromFilename(Tp_vid)
+        width, height, firstTamp1, interFrameOnly = getFrameDetailsFromFilename(Tp_vid)
+
+        if interFrameOnly:
+            continue
 
 
         mask_vid = Tp_vid.replace("_f.yuv","_mask.yuv")
@@ -169,6 +221,7 @@ if __name__ == "__main__":
 
         with open(Tp_vid, "rb") as f:
             mybytes = np.fromfile(f, 'u1')
+        print("There are {} bytes in the file width: {} height: {}".format(len(mybytes), width, height))
         num_frames = len(mybytes) / frameSize
         print("There are {} frames".format(num_frames))
 
