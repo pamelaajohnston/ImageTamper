@@ -37,9 +37,20 @@ INPUT_IMAGE_CHANNELS = 3
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 25782 # CASIA2
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 3102
 
+# 80 patch dataset - to go with QP evaluation (again)
+IMAGE_SIZE = 80
+IMAGE_WIDTH = 80
+IMAGE_HEIGHT = 80
+INPUT_IMAGE_SIZE = 80
+INPUT_IMAGE_WIDTH = 80
+INPUT_IMAGE_HEIGHT = 80
+INPUT_IMAGE_CHANNELS = 3
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 764640 # New QP dataset: UCID + Derf's
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 56392
+
 
 # Number of classes
-NUM_CLASSES = 2
+NUM_CLASSES = 8
 # This is the number of training examples in the dataset - one epoch runs over all the examples
 
 
@@ -127,8 +138,8 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
   """
   # Create a queue that shuffles the examples, and then
   # read 'batch_size' images + labels from the example queue.
-  #num_preprocess_threads = 16
-  num_preprocess_threads = 1
+  num_preprocess_threads = 16
+  #num_preprocess_threads = 1
   if shuffle:
     images, label_batch = tf.train.shuffle_batch(
         [image, label],
@@ -165,7 +176,7 @@ def distorted_inputs(data_dir, batch_size, distort=2):
   #filenames = [os.path.join(data_dir, 'patches_%d.bin' % i) for i in xrange(0, 8)]
   #filenames = [os.path.join(data_dir, 'patches_train_%d.bin' % i) for i in xrange(0, 1)]
   #filenames = [os.path.join(data_dir, 'train_crop.bin')]
-  filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
+  filenames = [os.path.join(data_dir, 'train_%d.bin' % i) for i in xrange(0, 10)]
 
   print("Expected filenames: {}".format(filenames))
 
@@ -247,12 +258,14 @@ def inputs(eval_data, data_dir, batch_size):
     filenames = [os.path.join(data_dir, 'train_crop.bin')]
     # For CASIA2 256x256 patches and 128x128 patches
     filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
+    filenames = [os.path.join(data_dir, 'train_%d.bin' % i) for i in xrange(0, 10)]
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
   else:
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
     filenames = [os.path.join(data_dir, 'patches_test_%d.bin' % i) for i in xrange(0, 1)]
     filenames = [os.path.join(data_dir, 'test_crop.bin')]
     #filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
+    filenames = [os.path.join(data_dir, 'test_%d.bin' % i) for i in xrange(0, 10)]
     print("Inputting test data which is {}".format(filenames))
 
 
