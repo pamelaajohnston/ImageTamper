@@ -53,6 +53,8 @@ NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 56392
 NUM_CLASSES = 8
 # This is the number of training examples in the dataset - one epoch runs over all the examples
 
+NUM_PREPROCESS_THREADS = 16
+
 
 def read_dataset(filename_queue):
   """Reads and parses examples from data files.
@@ -138,7 +140,7 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
   """
   # Create a queue that shuffles the examples, and then
   # read 'batch_size' images + labels from the example queue.
-  num_preprocess_threads = 16
+  num_preprocess_threads = NUM_PREPROCESS_THREADS
   #num_preprocess_threads = 1
   if shuffle:
     images, label_batch = tf.train.shuffle_batch(
