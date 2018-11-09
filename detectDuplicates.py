@@ -80,7 +80,7 @@ dataset_paths=[
 
 # Assumes YUV planar patches (or planar patches at any rate), so channel, height, width order.
 def makeNormalisedPatches(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channels, bit_depth, label, addLabel=True):
-    mybytes = frame.reshape(channels, pic_h, pic_w)
+    mybytes = frame.reshape(channels, height, width)
 
     patchesList = []
 
@@ -96,7 +96,7 @@ def makeNormalisedPatches(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channe
 
     patches_array = np.array(patchesList)
     patches_array = np.divide(patches_array, bit_depth)
-    print(patches_array.shape)
+    #print(patches_array.shape)
     return patches_array
 
 def makePatchLabels(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channels):
@@ -191,12 +191,6 @@ def getDimsFromFileName(vid):
         width = int(dims.group(1))
         height = int(dims.group(2))
         return width, height
-
-    # if we hit this, we're getting desperate...
-    if "Davino" in vid or "SULFA" in vid or "VTD" in vid:
-        width, height, firstTampFrame, interFrameOnly = getFrameDetailsFromFilename(vid)
-        return width, height
-
     return 0,0
 
 def getQuantFromFileName(vid):
@@ -210,173 +204,27 @@ def getQuantFromFileName(vid):
             qp = int(r.group(1))
     return qp
 
-def getIntraFromFileName(vid):
-    if "intraOnly" in vid:
-        return 0
-    else:
-        return 1
-
-
-def getDeblockFromFileName(vid):
-    if "withDeblock" in vid:
-        return 1
-    if "noDeblock" in vid:
-        return 0
-    return -1
-
-def getLabelFromFileName(vid, labelwith):
-    if labelwith == "qp":
-        qp = getQuantFromFileName(vid)
-        label = int(qp / 7)
-    if labelwith == "intraFrame":
-        print("label intra or not")
-        label = getIntraFromFileName(vid)
-    if labelwith == "deblock":
-        label = getDeblockFromFileName(vid)
-    return label
-
-
-# Defaults are for overlapping patches for heatmap generation
-def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSpacStep=16, num_channels=3, bit_depth=8):
-    width, height = getDimsFromFileName(fileIn)
-    patchList = []
-    #print("Width is {}, height is {}".format(width, height))
-    if label == "qp":
-        qp = getQuantFromFileName(fileIn)
-        if qp < 0:
-            qp = 0
-        label = int(qp / 7)
-
-
-    frameSize = width * height * 3 // 2
-    print("The file is {} with width {}, height {}, label {}".format(fileIn, width, height, label))
-
-    with open(fileIn, "rb") as f:
-        mybytes = np.fromfile(f, 'u1')
-    print("There are {} bytes in the file width: {} height: {}".format(len(mybytes), width, height))
-    num_frames = len(mybytes) / frameSize
-    print("There are {} frames".format(num_frames))
-
-
-    for f in range(0, num_frames, cropTempStep):
-        print("Frame number {}".format(f))
-        start = f*frameSize
-        end = start + frameSize
-        myframe = mybytes[start:end]
-        my444frame = functions.YUV420_2_YUV444(myframe, height, width)
-
-        patches = makeNormalisedPatches(my444frame, width, height, cropDim, cropDim, cropSpacStep, num_channels, bit_depth, label)
-        patchList.extend(patches)
-
-    patches_array = np.array(patchList)
-
-    patches_array = patches_array.flatten()
-    patchSize = (cropDim * cropDim * 3) + 1
-    numPatches = patches_array.shape[0]/patchSize
-    print("Dims: {}, numPatches {}".format(patches_array.shape, numPatches))
-    patches_array = patches_array.reshape((numPatches, patchSize))
-
-
-    ############## Here's where you name the files!!!!###########
-
-    multipleOutFiles = False
-    if multipleOutFiles:
-        numBinFiles = 10
-        patchesPerFile = numPatches // numBinFiles
-        if numPatches < 100:
-            patchesPerFile = 1
-
-        for i in range(0, (numBinFiles-1)):
-            outFileName = "{}_{}.bin".format(fileOut, i)
-            start = patchesPerFile * i
-            end = start+patchesPerFile
-            arrayCut = patches_array[start:end, :]
-            outFileName = os.path.join(cropDir, outFileName)
-            functions.appendToFile(arrayCut, outFileName)
-
-        # the last file is a bit bigger
-        outFileName = "{}_{}.bin".format(binFileName, numBinFiles)
-        start = patchesPerFile * (numBinFiles-1)
-        arrayCut = patches_array[start:, :]
-        outFileName = os.path.join(cropDir, outFileName)
-        functions.appendToFile(arrayCut, outFileName)
-    else:
-        functions.appendToFile(patches_array, fileOut)
-    return numPatches
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
     summary = "intraForQP"
     dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_train','/Volumes/LaCie/data/UCID/train']
-    shuffled = True
-    binFileName = "train"
-    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_test','/Volumes/LaCie/data/UCID/test']
-    shuffled = False
-    labelwith = "qp"
-    binFileName = "test"
-
-
-    summary = "intra0VsInter1"
-    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_train', '/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_train']
-    binFileName = "train"
-    shuffled = True
-    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_test', '/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test']
-    binFileName = "test"
-    shuffled = False
-    labelwith = "intraFrame"
-    avoidFrames = [0, 249, 499, 749, 999, 1249, 1499]
-
-
-    summary = "deblock1"
-    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_withDeblock_train', '/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_train']
-    binFileName = "train"
-    shuffled = True
-    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_withDeblock_test', '/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test']
-    binFileName = "test"
-    shuffled = False
-    labelwith = "deblock"
-    avoidFrames=[]
-
+    #dirs = ['/Volumes/LaCie/data/UCID/train']
+    #dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_test','/Volumes/LaCie/data/UCID/test']
     #dirs = ['/Users/pam/Documents/data/testyuv']
-
-
-    # width, height get over written later
     height = 720
     width = 1280
-
-    # You should set these appropriately depending on how many patches you want
     cropDim = 80
     cropSpacStep = 48
     cropTempStep = 40
-
-    # These are constant (I haven't tried varying them)
+    #cropSpacStep = 80
+    #cropTempStep = 1
     num_channels = 3
     bit_depth = 8 # please remember to normalise
-
-
     patchSize = cropDim * cropDim * 3
 
+    binFileName = "test"
+    shuffled = False
     shuffledText = "unshuffled"
     if shuffled:
         shuffledText = "shuffled"
@@ -404,97 +252,135 @@ if __name__ == "__main__":
         l = glob.glob(os.path.join(dir, "*", "*.yuv"))
         vidlist = vidlist + l
 
-    print(vidlist)
+    #print(vidlist)
     #quit()
     # now prepare the list with heights and widths
     fullList = []
     errorList = []
     for vid in vidlist:
         width, height = getDimsFromFileName(vid)
-        label = 0
-        label = getLabelFromFileName(vid, labelwith)
-
-
-        if width == 0 or height == 0 or label == -1:
-            errorList.append([vid, width, height, label])
-        fullList.append([vid, width, height, label])
+        qp = getQuantFromFileName(vid)
+        if width == 0 or height == 0 or qp == -1:
+            errorList.append([vid, width, height, qp])
+        fullList.append([vid, width, height, qp])
 
     for line in errorList:
         print line
 
-    patchList = []
+
+    grouplist = []
+
+    for vid in vidlist:
+        head, tail = os.path.split(vid)
+        basename, ext = os.path.splitext(tail)
+        basename = basename.split('_')
+        basename = "_".join(basename[:-1])
+        foundAGroup = False
+        for group in grouplist:
+            if basename in group[0]:
+                group = group.append(vid)
+                foundAGroup = True
+
+        if not foundAGroup:
+            newGroup = [vid]
+            groupList = grouplist.append(newGroup)
 
 
-    for entry in fullList:
-        vid, width, height, label = entry
-        # assuming YUV 420, which is fair
+    filesPerGroup = len(grouplist[0])
+
+
+    identicalpatches = np.zeros((filesPerGroup, filesPerGroup))
+    prevIdenticalPatches = identicalpatches.copy()
+    maxDiff = 0
+
+    UCID_identical = identicalpatches.copy()
+    Vid_identical = identicalpatches.copy()
+    totalPatches = 0
+
+    for group in grouplist:
+        patchList = []
+        width, height = getDimsFromFileName(vid)
         frameSize = width * height * 3 // 2
-        print("The file is {} with width {}, height {}, label {}".format(vid, width, height, label))
+        label=0
 
-        #mask_vid = Tp_vid.replace("_f.yuv","_mask.yuv")
-        #patch_vid = Tp_vid.replace("_f.yuv", "_patches.yuv444")
-        #open(patch_vid, 'w').close()
-        #bin_vid = Tp_vid.replace("_f.yuv", "_patches.bin")
+        for i, vid in enumerate(group):
+            with open(vid, "rb") as f:
+                mybytes = np.fromfile(f, 'u1')
+            num_frames = len(mybytes) / frameSize
+            patchesPerFile = 0
+            for f in range(0, num_frames, cropTempStep):
+                #print("Frame number {}".format(f))
+                start = f*frameSize
+                end = start + frameSize
+                myframe = mybytes[start:end]
+                my444frame = functions.YUV420_2_YUV444(myframe, height, width)
 
-        with open(vid, "rb") as f:
-            mybytes = np.fromfile(f, 'u1')
-        print("There are {} bytes in the file width: {} height: {}".format(len(mybytes), width, height))
-        num_frames = len(mybytes) / frameSize
-        print("There are {} frames".format(num_frames))
+                patches = makeNormalisedPatches(my444frame, width, height, cropDim, cropDim, cropSpacStep, num_channels, bit_depth, label, addLabel=False)
+                #print "The shape of patches = {}".format(patches.shape)
+                patchesPerFile = patchesPerFile + patches.shape[0]
+                totalPatches = totalPatches + patches.shape[0]
+                patchList.extend(patches)
+
+        patches_array = np.array(patchList)
+        patches_array = patches_array.flatten()
+        patchSize = (cropDim * cropDim * 3) # no label
+        #print(patches_array.shape)
+        numPatches = patches_array.shape[0]/patchSize
+        patches_array = patches_array.reshape((numPatches, patchSize))
+        numFiles = len(group)
+        patches_array = patches_array.reshape((numFiles, patchesPerFile, patchSize))
+
+        # for each patch, calculate PSNR....Abs diff?
+        for i in range(0, patchesPerFile):
+            for file1No in range(0, numFiles):
+                for file2No in range((file1No+1), numFiles):
+                #for file2No in range(0, numFiles):
+                    #print(patches_array[file1No, i, 80:160])
+                    #print "***********"
+                    #print(patches_array[file2No, i, 80:160])
+                    a1 = patches_array[file1No, i, :].astype(np.int32)
+                    a2 = patches_array[file2No, i, :].astype(np.int32)
+                    diff =  a1 - a2
+                    absDiff = np.absolute(diff)
+                    maximum = absDiff.max()
+                    total = np.sum(absDiff)
+                    #print(total)
+                    if (total == 0):
+                        #patches are identical
+                        identicalpatches[file2No, file1No] = identicalpatches[file2No, file1No] + 1
+                    #print("The patch size is {} and maximum is {}, or maybe {}".format(patchSize, maximum))
+                    #print "Comparing file {} and file {} total MAD: {}".format(file1No, file2No, (total/patchSize))
+                    if maximum > maxDiff:
+                        maxDiff = maximum
 
 
-        for f in range(0, num_frames, cropTempStep):
-            print("Frame number {}".format(f))
-            if f in avoidFrames:
-                print("Avoiding frame {}".format(f))
-                f = f+1
-                if f > num_frames:
-                    break
-            start = f*frameSize
-            end = start + frameSize
-            myframe = mybytes[start:end]
-            my444frame = functions.YUV420_2_YUV444(myframe, height, width)
+        #print(identicalpatches)
+        identicalPatchesFile = identicalpatches - prevIdenticalPatches
+        prevIdenticalPatches = identicalpatches.copy()
 
-            patches = makeNormalisedPatches(my444frame, width, height, cropDim, cropDim, cropSpacStep, num_channels, bit_depth, label)
-            patchList.extend(patches)
+        if np.count_nonzero(identicalPatchesFile) > 0:
+            print(group[0])
+            print("Dims: {}, files: {} numPatches: {}".format(patches_array.shape, len(group), patchesPerFile))
+            print "The identical patches confusion matrix for this file (only top triangle is valid!):"
+            print(identicalPatchesFile)
+            #print("running totals")
+            #print(identicalpatches)
+            print("Maximum absolute difference = {}".format(maxDiff))
+            print("****************************************************************************")
+        else:
+            print("Identical {}".format(group[0]))
 
-    patches_array = np.array(patchList)
-
-    # DEBUGGING starts here!!!!!
-
-    patches_array = patches_array.flatten()
-    patchSize = (cropDim * cropDim * 3) + 1
-    print(patches_array.shape)
-    numPatches = patches_array.shape[0]/patchSize
-    print("Dims: {}, numPatches {}".format(patches_array.shape, numPatches))
-    patches_array = patches_array.reshape((numPatches, patchSize))
-
-
-    # dirty shuffle, hope the array isn't too big!!!
-    if shuffled:
-        np.random.shuffle(patches_array)
-
-    print("Ok, shuffling done, we have {} patches and shape {}".format(numPatches, patches_array.shape))
-
-    ############## Here's where you name the files!!!!###########
-    numBinFiles = 10
-    patchesPerFile = numPatches//numBinFiles
-    if numPatches < 100:
-        patchesPerFile = 1
-
-    for i in range(0, (numBinFiles-1)):
-        outFileName = "{}_{}.bin".format(binFileName, i)
-        start = patchesPerFile * i
-        end = start+patchesPerFile
-        #print("{} end {}".format(start, end))
-        arrayCut = patches_array[start:end, :]
-        outFileName = os.path.join(cropDir, outFileName)
-        functions.appendToFile(arrayCut, outFileName)
-
-    # the last file is a bit bigger
-    outFileName = "{}_{}.bin".format(binFileName, (numBinFiles-1))
-    start = patchesPerFile * (numBinFiles-1)
-    arrayCut = patches_array[start:, :]
-    outFileName = os.path.join(cropDir, outFileName)
-    functions.appendToFile(arrayCut, outFileName)
+        if "UCID" in group[0]:
+            UCID_identical = UCID_identical + identicalPatchesFile
+        else:
+            Vid_identical = Vid_identical + identicalPatchesFile
+    ########### Summary report ##############
+    print("########### Summary report ##############")
+    print("Confusion Matrix for UCID:")
+    print(UCID_identical)
+    print("Video Confusion Matrix:")
+    print(Vid_identical)
+    percentageIdentical = 100* np.sum(identicalpatches)/totalPatches
+    print("We have {} identical patches".format(percentageIdentical))
     quit()
+

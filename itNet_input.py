@@ -123,7 +123,7 @@ def read_dataset(filename_queue):
 
 
 
-def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size, shuffle):
+def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size, shuffle, singleThreaded=False):
   """Construct a queued batch of images and labels.
 
   Args:
@@ -141,7 +141,8 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
   # Create a queue that shuffles the examples, and then
   # read 'batch_size' images + labels from the example queue.
   num_preprocess_threads = NUM_PREPROCESS_THREADS
-  #num_preprocess_threads = 1
+  if singleThreaded:
+    num_preprocess_threads = 1
   if shuffle:
     images, label_batch = tf.train.shuffle_batch(
         [image, label],
@@ -242,7 +243,7 @@ def distorted_inputs(data_dir, batch_size, distort=2):
 
 
 
-def inputs(eval_data, data_dir, batch_size):
+def inputs(eval_data, data_dir, batch_size, singleThreaded=False, filename="", numExamplesToTest = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL):
   """Construct input for dataset evaluation using the Reader ops.
 
   Args:
@@ -254,21 +255,26 @@ def inputs(eval_data, data_dir, batch_size):
     images: Images. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, INPUT_IMAGE_CHANNELS] size.
     labels: Labels. 1D tensor of [batch_size] size.
   """
-  if not eval_data:
-    #filenames = [os.path.join(data_dir, 'patches_%d.bin' % i) for i in xrange(0, 8)] # original based on CIF vid
-    filenames = [os.path.join(data_dir, 'patches_train_%d.bin' % i) for i in xrange(0, 1)]
-    filenames = [os.path.join(data_dir, 'train_crop.bin')]
-    # For CASIA2 256x256 patches and 128x128 patches
-    filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
-    filenames = [os.path.join(data_dir, 'train_%d.bin' % i) for i in xrange(0, 10)]
-    num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+  if filename == "":
+    if not eval_data:
+      #filenames = [os.path.join(data_dir, 'patches_%d.bin' % i) for i in xrange(0, 8)] # original based on CIF vid
+      filenames = [os.path.join(data_dir, 'patches_train_%d.bin' % i) for i in xrange(0, 1)]
+      filenames = [os.path.join(data_dir, 'train_crop.bin')]
+      # For CASIA2 256x256 patches and 128x128 patches
+      filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
+      filenames = [os.path.join(data_dir, 'train_%d.bin' % i) for i in xrange(0, 10)]
+      num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+    else:
+      num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+      filenames = [os.path.join(data_dir, 'patches_test_%d.bin' % i) for i in xrange(0, 1)]
+      filenames = [os.path.join(data_dir, 'test_crop.bin')]
+      #filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
+      filenames = [os.path.join(data_dir, 'test_%d.bin' % i) for i in xrange(0, 10)]
+      print("Inputting test data which is {}".format(filenames))
   else:
-    num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
-    filenames = [os.path.join(data_dir, 'patches_test_%d.bin' % i) for i in xrange(0, 1)]
-    filenames = [os.path.join(data_dir, 'test_crop.bin')]
-    #filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
-    filenames = [os.path.join(data_dir, 'test_%d.bin' % i) for i in xrange(0, 10)]
-    print("Inputting test data which is {}".format(filenames))
+      num_examples_per_epoch = numExamplesToTest
+      filenames = [filename]
+      print("Test data comes from {} and {} examples".format(filenames, numExamplesToTest))
 
 
   for f in filenames:
@@ -299,4 +305,4 @@ def inputs(eval_data, data_dir, batch_size):
   # Generate a batch of images and labels by building up a queue of examples.
   return _generate_image_and_label_batch(float_image, read_input.label,
                                          min_queue_examples, batch_size,
-                                         shuffle=False)
+                                         shuffle=False, singleThreaded=singleThreaded)

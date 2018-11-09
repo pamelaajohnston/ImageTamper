@@ -65,9 +65,9 @@ LEARNING_RATE_DECAY_FACTOR = 0.5  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 
 # For Nao and Ri
-NUM_EPOCHS_PER_DECAY = 10.0      # Epochs after which learning rate decays.
-LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
-INITIAL_LEARNING_RATE = 0.01       # Initial learning rate.
+#NUM_EPOCHS_PER_DECAY = 10.0      # Epochs after which learning rate decays.
+#LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
+#INITIAL_LEARNING_RATE = 0.01       # Initial learning rate.
 
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
@@ -244,7 +244,7 @@ def distorted_inputs():
   return images, labels
 
 
-def inputs(eval_data):
+def inputs(eval_data, singleThreaded=False, filename="", numExamplesToTest=NUM_EXAMPLES_PER_EPOCH_FOR_EVAL):
   """Construct input for evaluation using the Reader ops.
 
   Args:
@@ -267,7 +267,11 @@ def inputs(eval_data):
 
   images, labels = itNet_input.inputs(eval_data=eval_data,
                                         data_dir=data_dir,
-                                        batch_size=FLAGS.batch_size)
+                                        batch_size=FLAGS.batch_size,
+                                        singleThreaded = singleThreaded,
+                                        filename = filename,
+                                        numExamplesToTest = numExamplesToTest
+                                      )
   if FLAGS.use_fp16:
     images = tf.cast(images, tf.float16)
     labels = tf.cast(labels, tf.float16)
