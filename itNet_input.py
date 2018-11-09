@@ -48,9 +48,21 @@ INPUT_IMAGE_CHANNELS = 3
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 764640 # New QP dataset: UCID + Derf's
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 56392
 
+# 80 patch dataset - to go with intra/inter AND Deblock
+IMAGE_SIZE = 80
+IMAGE_WIDTH = 80
+IMAGE_HEIGHT = 80
+INPUT_IMAGE_SIZE = 80
+INPUT_IMAGE_WIDTH = 80
+INPUT_IMAGE_HEIGHT = 80
+INPUT_IMAGE_CHANNELS = 3
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 836512 # New QP dataset: UCID + Derf's
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 12992
+
 
 # Number of classes
-NUM_CLASSES = 8
+#NUM_CLASSES = 8
+NUM_CLASSES = 2
 # This is the number of training examples in the dataset - one epoch runs over all the examples
 
 NUM_PREPROCESS_THREADS = 16
