@@ -283,6 +283,8 @@ def inputs(eval_data, singleThreaded=False, filename="", numExamplesToTest=NUM_E
 
 
 def inference_switch(images, type=1):
+    #NUM_CLASSES = itNet_input.NUM_CLASSES
+
     #if FLAGS.binarise_label > 0:
     #    NUM_CLASSES = 2
     #    itNet_input.NUM_CLASSES = 2

@@ -69,6 +69,8 @@ tampered_video_data=[
     ["Davino",  "08_TREE",      1280, 720,  0,  244,     0, 0],
     ["Davino",  "09_GIRL",      1280, 720,207,  370,     0, 0],
     ["Davino",  "10_DOG",       1280, 720,  0,  185,     0, 0],
+    ["DeepFakes","creepy2",     1280, 720,  0,  200,     0, 0],
+    ["DeepFakes", "creepy1",    1280, 720,  0,  200,     0, 0],
 ]
 
 
@@ -96,7 +98,7 @@ def makeNormalisedPatches(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channe
 
     patches_array = np.array(patchesList)
     patches_array = np.divide(patches_array, bit_depth)
-    print(patches_array.shape)
+    #print(patches_array.shape)
     return patches_array
 
 def makePatchLabels(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channels):
@@ -193,7 +195,7 @@ def getDimsFromFileName(vid):
         return width, height
 
     # if we hit this, we're getting desperate...
-    if "Davino" in vid or "SULFA" in vid or "VTD" in vid:
+    if "Davino" in vid or "SULFA" in vid or "VTD" in vid or "DeepFakes" in vid:
         width, height, firstTampFrame, interFrameOnly = getFrameDetailsFromFilename(vid)
         return width, height
 
@@ -246,6 +248,8 @@ def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSp
         if qp < 0:
             qp = 0
         label = int(qp / 7)
+    if label == "none":
+        label = 0
 
 
     frameSize = width * height * 3 // 2
@@ -259,7 +263,7 @@ def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSp
 
 
     for f in range(0, num_frames, cropTempStep):
-        print("Frame number {}".format(f))
+        #print("Frame number {}".format(f))
         start = f*frameSize
         end = start + frameSize
         myframe = mybytes[start:end]
