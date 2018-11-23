@@ -31,6 +31,8 @@ import itNet_input
 # import liftedTFfunctions
 import patchIt2 as pi
 import functions
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -225,6 +227,21 @@ deblockNetwork = {
     "checkpoint_dir": "../trainedNetworks/it_train_deblock_opt1/",
     "predFilename": "deblockPred.csv"
 }
+clustersNetwork = {
+    "summary": "clusters",
+    "num_classes": 5,
+    "network_architecture": 28,
+    "checkpoint_dir": "dummy",
+    "predFilename": "clusters.csv"
+}
+
+#keyframesNetwork = {
+#    "summary": "keyframes",
+#    "num_classes": 5,
+#    "network_architecture": 28,
+#    "checkpoint_dir": "dummy",
+#    "predFilename": ""
+#}
 
 def predictNumPatches(fileSize, cropDim, tempStep, spacStep, height, width):
     frameSize = width * height * 3 // 2
@@ -235,12 +252,36 @@ def predictNumPatches(fileSize, cropDim, tempStep, spacStep, height, width):
     numPatches = patchedFrames * patchWidth * patchHeight
     return numPatches
 
+def deriveMaskFilename(filename):
+    if "Davino" in filename or "VTD" in filename or "SULFA" in filename:
+        maskfilename = filename.replace("_f.yuv", "_mask.yuv")
+
+    return maskfilename
 
 
-def main(argv=None):  # pylint: disable=unused-argument
-    doPatching = True
-    doEvaluation = True
+
+#def main(argv=None):  # pylint: disable=unused-argument
+def doEverything():
+    doPatching = False
+    doEvaluation = False
+    doClustering = False
+    doFrameAnalysis = False
+    doYUVSummary = False
+    doGroundTruthProcessing = False
+    doIOU = False
+    doHeatmaps = False
+    multiTruncatedOutput = False
+
+    #doPatching = True
+    #doEvaluation = True
     doClustering = True
+    #doFrameAnalysis = True
+    doYUVSummary = True
+    doGroundTruthProcessing = True
+    doIOU = True
+    doHeatmaps = True
+    #multiTruncatedOutput = True
+
     numPatches = 0
 
     if tf.gfile.Exists(FLAGS.eval_dir):
@@ -263,6 +304,10 @@ def main(argv=None):  # pylint: disable=unused-argument
 
     inFilename = os.path.join(FLAGS.data_dir, FLAGS.yuvfile)
     outFilename = os.path.join(myDataDirName, "test.bin")
+    maskFilename = deriveMaskFilename(inFilename)
+    print(maskFilename)
+    clustersCSV = os.path.join(myHeatmapFileDir, "clusters.csv")
+    gtCSV = os.path.join(myHeatmapFileDir, "gt.csv")
 
     width, height = pi.getDimsFromFileName(inFilename)
 
@@ -272,12 +317,18 @@ def main(argv=None):  # pylint: disable=unused-argument
     num_channels = 3
     bit_depth = 8
 
+    predsWidth = (width - cropDim) // cropSpacStep
+    predsHeight = (height - cropDim) // cropSpacStep
+
     networks = [qpNetwork, ipNetwork, deblockNetwork]
 
 
     fileSize = os.path.getsize(inFilename)
     numPatches = predictNumPatches(fileSize=fileSize, cropDim=cropDim,
                                    tempStep=cropTempStep, spacStep=cropSpacStep, height=height, width=width)
+    frameSize = width * height
+    numFrames = int((fileSize // (frameSize * 3 / 2)) // cropTempStep)
+
     print(numPatches)
 
 
@@ -293,7 +344,7 @@ def main(argv=None):  # pylint: disable=unused-argument
         print("End patching")
 
     if doEvaluation:
-        print("Begin evaluation")
+        print("Begin evaluation - calculating predictions on the trained networks")
         for network in networks:
             FLAGS.checkpoint_dir = network['checkpoint_dir']
             FLAGS.network_architecture = network['network_architecture']
@@ -319,88 +370,261 @@ def main(argv=None):  # pylint: disable=unused-argument
 
     if doClustering:
         print("Begin combination of preds")
-        from sklearn.cluster import KMeans
 
-        allPreds = []
-        clusteredNetworks = [qpNetwork, deblockNetwork]
-        for network in networks:
-            predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
-            predVals = np.loadtxt(predFilename)
-            predVals = predVals[0:numPatches]
-            normPredVals = predVals / np.linalg.norm(predVals)
-            allPreds.extend(normPredVals)
+        if kmeansClustering:
+            allPreds = []
+            clusteredNetworks = [qpNetwork, deblockNetwork]
+            clusteredNetworks = [qpNetwork,]
+            for network in clusteredNetworks:
+                predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
+                predVals = np.loadtxt(predFilename)
+                predVals = predVals[0:numPatches]
+                normPredVals = predVals / np.linalg.norm(predVals)
+                allPreds.extend(normPredVals)
 
-        allPreds = np.asarray(allPreds)
-        allPreds = allPreds.flatten()
-        allPreds = allPreds.reshape(len(networks), numPatches)
-        allPreds = np.swapaxes(allPreds, 0, 1)
-        #print(allPreds)
-        model = KMeans(n_clusters=2)
+            allPreds = np.asarray(allPreds)
+            allPreds = allPreds.flatten()
+            allPreds = allPreds.reshape(len(clusteredNetworks), numPatches)
+            allPreds = np.swapaxes(allPreds, 0, 1)
+            #print(allPreds)
+            model = KMeans(n_clusters=2)
 
-        # Fitting Model
-        model.fit(allPreds)
+            # Fitting Model
+            model.fit(allPreds)
 
-        # Prediction on the entire data
-        all_predictions = model.predict(allPreds)
-        #print(all_predictions)
+            # Prediction on the entire data
+            all_predictions = model.predict(allPreds)
+            np.savetxt(clustersCSV, all_predictions, delimiter=",", fmt='%1.0f')
+            #print(all_predictions)
 
         print("End combination of preds")
 
 
-    # Now generate the heatmap from the preds in "pred.csv"
-    print("Begin generating heatmaps")
-    generateAll = False
-    for generateAll in [True, False]:
-        for network in networks:
-            if generateAll:
-                predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
-                myHeatmapFileName = "{}.yuv".format(network['summary'])
-                myHeatmapFileName =os.path.join(myHeatmapFileDir, myHeatmapFileName)
-                predVals = np.loadtxt(predFilename)
-                predVals = predVals[0:numPatches]
+
+
+
+
+
+
+    keyFrames = np.asarray(range(0, numFrames))
+    if doFrameAnalysis:
+        print("Doing frame analysis")
+        patchWidth = (width - cropDim) // cropSpacStep
+        patchHeight = (height - cropDim) // cropSpacStep
+        patchFrame = patchHeight * patchWidth
+
+        #clusteredNetworks = [qpNetwork, deblockNetwork]
+        clusteredNetworks = [qpNetwork,]
+        keyFrames = []
+        for i, network in enumerate(clusteredNetworks):
+            predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
+            predVals = np.loadtxt(predFilename)
+            predVals = predVals[0:numPatches]
+            predVals = (predVals / np.linalg.norm(predVals))*100 # normalising
+            predVals = predVals.reshape(numFrames,patchFrame)
+            avgs = predVals.mean(axis=1)*1000
+            #print(avgs)
+            plotDiff = True
+            if plotDiff:
+                avgs = np.diff(avgs)
+                avgs = np.insert(avgs, 0, avgs[0]).reshape(-1, 1)
+                frames = range(0, numFrames)
             else:
-                myHeatmapFileName = "clusters.yuv"
-                myHeatmapFileName =os.path.join(myHeatmapFileDir, myHeatmapFileName)
-                predVals = all_predictions
+                avgs = avgs.reshape(-1, 1)
+                frames = range(0, numFrames)
 
-            if tf.gfile.Exists(myHeatmapFileName):
-               os.remove(myHeatmapFileName)
+            #print("Here's the diffs for {}".format(network['summary']))
+            #print(avgs)
+            plt.plot(frames, avgs)
+            plt.title("Frame average for {}".format(network['predFilename']))
+            plt.xlabel("Frame number")
+            plt.ylabel("Average value from {}".format(network['predFilename']))
+            plt.savefig("a_{}.png".format(network['summary']))
+            plt.close()
+            model = KMeans(n_clusters=2)
+            model.fit(avgs)
+            frameTypes = model.predict(avgs)
+            # Now make sure the minority class (the key frames) is always 1
+            numOnes = len(np.where(frameTypes == 1))
+            numZeros = len(np.where(frameTypes == 1))
+            if numOnes > numZeros:
+                print("Inverting binary matrix, but this might not work!")
+                frameTypes = 1 - frameTypes
+            mylist = np.where(frameTypes == 1)
+            keyFrames.append(mylist[0].tolist())
+
+        keyFrames = np.asarray(keyFrames)
+        #print(keyFrames)
+        keyFrames = keyFrames.flatten()
+        #print(keyFrames)
+        keyFrames = np.unique(keyFrames)
+        print("End of frame analysis")
+
+    if doYUVSummary:
+        print("Summarising YUV and mask files with key frames {}".format(keyFrames))
+        # create a cut-down YUV file
+        yuvFiles = [inFilename, maskFilename] # and add in ground truth mask or whatever
+        for file in yuvFiles:
+            keyframesFilename = os.path.join(myHeatmapFileDir, "keyframes.yuv")
+            if "mask" in file:
+                keyframesFilename = os.path.join(myHeatmapFileDir, "keyframes_mask.yuv")
+            if tf.gfile.Exists(keyframesFilename):
+                os.remove(keyframesFilename)
+            with open(file, "rb") as f:
+                mybytes = np.fromfile(f, 'u1')
+            fs = int(height * width * 3/2)
+
+            for f in keyFrames:
+                start = f * fs
+                end = start + fs
+                theFrame = mybytes[start:end]
+                functions.appendToFile(theFrame, keyframesFilename)
+        print("End of YUV summarising")
 
 
-            frameSize = width * height
-            fileBytes = os.path.getsize(inFilename)
-            numFrames = int((fileBytes // (frameSize * 3 / 2)) // cropTempStep)
-            if numFrames == 0:
-                numFrames = 1
-            predsWidth = (width - cropDim) // cropSpacStep
-            predsHeight = (height - cropDim) // cropSpacStep
-            predsPerFrame = predVals.shape[0] // numFrames
-            # print(predVals.reshape((predsHeight, predsWidth)))
-            print("numFrames {} predsWidth {} predsHeight {} predsPerFrame {}".format(numFrames, predsWidth, predsHeight,
-                                                                                      predsPerFrame))
 
-            # This is because we're using 8 labels.
-            multiplier = 256 // network['num_classes']
-            predVals = predVals * multiplier
-            padding = cropDim // 2
-            uv = np.full((frameSize // 2), 128)
 
-            for f in range(0, numFrames):
-                predsStart = f * predsPerFrame
-                predsEnd = predsStart + predsPerFrame
-                framePreds = predVals[predsStart:predsEnd]
-                framePreds = framePreds.reshape((predsHeight, predsWidth))
-                framePreds = framePreds.repeat(cropSpacStep, axis=0).repeat(cropSpacStep, axis=1)
-                framePreds = np.pad(framePreds, ((padding, padding), (padding, padding)), 'edge')
-                functions.appendToFile(framePreds, myHeatmapFileName)
-                functions.appendToFile(uv, myHeatmapFileName)
 
-            if not generateAll:
-                break
 
-    print("Done generating heatmap")
+    if doGroundTruthProcessing:
+        print("Turning mask file {} into a pred csv".format(maskFilename))
+        fs = int(height * width * 3 / 2)
+        with open(maskFilename, "rb") as f:
+            mybytes = np.fromfile(f, 'u1')
 
-    print("The shape of the YUV: {}".format(predVals.shape))
+        mybytes = mybytes.reshape((numFrames, fs))
+        mybytes = mybytes[:, 0:frameSize] # Take only Y component
+        mybytes = mybytes.reshape((numFrames, height, width))
+        patchesList = []
+        for f in range(0, numFrames, cropTempStep):
+            for y in range((cropDim//2), (height - (cropDim//2)), cropSpacStep):
+                yend = y + cropSpacStep
+                for x in range((cropDim//2), (width - (cropDim//2)), cropSpacStep):
+                    xend = x + cropSpacStep
+                    patch = mybytes[f, y:yend, x:xend]
+                    patch = patch.flatten()
+                    patch = patch - 16
+                    #print("The patch is")
+                    #print(patch)
+
+                    label = 0
+                    if np.sum(patch) != 0:
+                        label = 1
+                    #print("the label is {}".format(label))
+
+                    patchesList.append(label)
+        patches = np.asarray(patchesList)
+        #print("There are {} patches from a {} by {} file".format(patches.shape, width, height))
+        np.savetxt(gtCSV, patches, delimiter=',', fmt='%1.0f')
+        print("Finished turning mask.yuv into gt.csv")
+
+    if doIOU:
+        print("Comparing gt.csv and clusters.csv using Intersection over Union")
+        iouResult = 0
+
+        predsPerFrame = predsWidth * predsHeight
+        totalPreds = predsPerFrame * keyFrames.shape[0]
+
+        gtVals = np.loadtxt(gtCSV)
+        gtVals = gtVals[0:totalPreds]
+        predVals = np.loadtxt(clustersCSV)
+        predVals = predVals[0:totalPreds]
+        gtVals = gtVals != 0
+        np.set_printoptions(threshold=np.nan)
+        #print(gtVals)
+        predVals = predVals != 0
+        #print(predVals)
+
+        intersect = gtVals & predVals
+        intersect = np.count_nonzero(intersect, axis=0)
+        #print(intersect)
+        union = gtVals | predVals
+        union = np.count_nonzero(union, axis=0)
+        #print(union)
+
+        if union == 0:
+            iouResult = 0
+        else:
+            iouResult = intersect / union
+
+
+        print("Done the comparison. Result was IOU={} which is {} over {} for file {} for frames {}".format(iouResult,
+                                                                                                intersect,
+                                                                                                union,
+                                                                                                inFilename,
+                                                                                                keyFrames))
+
+
+
+
+
+
+
+
+
+    if multiTruncatedOutput:
+        keyFrames = range(0, numFrames)
+
+
+
+    # Now generate the heatmap from the preds in "pred.csv"
+    if doHeatmaps:
+        print("Begin generating heatmaps")
+        for generateAll in [0, 1, 2]:
+            for network in networks:
+                if generateAll == 0:
+                    predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
+                    myHeatmapFileName = "{}.yuv".format(network['summary'])
+                    myHeatmapFileName =os.path.join(myHeatmapFileDir, myHeatmapFileName)
+                    predVals = np.loadtxt(predFilename)
+                elif generateAll == 1: # the clusters
+                    myHeatmapFileName =os.path.join(myHeatmapFileDir, "clusters.yuv")
+                    predVals = np.loadtxt(clustersCSV)
+                else: # the ground truth
+                    myHeatmapFileName =os.path.join(myHeatmapFileDir, "gt_blocked.yuv")
+                    predVals = np.loadtxt(gtCSV)
+
+                print(predVals.shape)
+                predVals = predVals[0:numPatches]
+
+
+                if tf.gfile.Exists(myHeatmapFileName):
+                   os.remove(myHeatmapFileName)
+
+
+                if numFrames == 0:
+                    numFrames = 1
+
+                predsPerFrame = predVals.shape[0] // numFrames
+                # print(predVals.reshape((predsHeight, predsWidth)))
+                print("numFrames {} predsWidth {} predsHeight {} predsPerFrame {}".format(numFrames, predsWidth, predsHeight,
+                                                                                          predsPerFrame))
+
+                # This is because we're using 8 labels.
+                multiplier = 256 // network['num_classes']
+                predVals = predVals * multiplier
+                padding = cropDim // 2
+
+                uvValue = 128 # this is for grey
+                uv = np.full((frameSize // 2), uvValue)
+
+                for f in keyFrames:
+                    predsStart = f * predsPerFrame
+                    predsEnd = predsStart + predsPerFrame
+                    framePreds = predVals[predsStart:predsEnd]
+                    framePreds = framePreds.reshape((predsHeight, predsWidth))
+                    framePreds = framePreds.repeat(cropSpacStep, axis=0).repeat(cropSpacStep, axis=1)
+                    framePreds = np.pad(framePreds, ((padding, padding), (padding, padding)), 'edge')
+                    functions.appendToFile(framePreds, myHeatmapFileName)
+                    functions.appendToFile(uv, myHeatmapFileName)
+
+
+                if generateAll > 0:
+                    break
+
+        print("Done generating heatmap(s)")
+
+    #print("The shape of the YUV: {}".format(predVals.shape))
     # uv = np.full(heatmap.shape, 128)
     # heatmap = np.append(heatmap, uv)
     # heatmap = np.append(heatmap, uv)
@@ -410,6 +634,40 @@ def main(argv=None):  # pylint: disable=unused-argument
     if tf.gfile.Exists(FLAGS.eval_dir):
         tf.gfile.DeleteRecursively(FLAGS.eval_dir)
 
+
+yuvfileslist =[
+    #["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_f.yuv", "/Users/pam/Documents/results/Davino/tank"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_f.yuv", "/Users/pam/Documents/results/Davino/man"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_f.yuv", "/Users/pam/Documents/results/Davino/helicopter"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_f.yuv", "/Users/pam/Documents/results/Davino/hen"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "06_LION_f.yuv", "/Users/pam/Documents/results/Davino/lion"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_f.yuv", "/Users/pam/Documents/results/Davino/ufo"],
+    #["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "09_GIRL_f.yuv", "/Users/pam/Documents/results/Davino/girl"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "10_DOG_f.yuv", "/Users/pam/Documents/results/Davino/dog"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "01_f.yuv", "/Users/pam/Documents/results/SULFA/01"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "02_f.yuv", "/Users/pam/Documents/results/SULFA/02"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "03_f.yuv", "/Users/pam/Documents/results/SULFA/03"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "04_f.yuv", "/Users/pam/Documents/results/SULFA/04"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "05_f.yuv", "/Users/pam/Documents/results/SULFA/05"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "06_f.yuv", "/Users/pam/Documents/results/SULFA/06"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "07_f.yuv", "/Users/pam/Documents/results/SULFA/07"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "08_f.yuv", "/Users/pam/Documents/results/SULFA/08"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "09_f.yuv", "/Users/pam/Documents/results/SULFA/09"],
+    ["/Users/pam/Documents/data/SULFA_yuv/", "10_f.yuv", "/Users/pam/Documents/results/SULFA/10"],
+]
+
+def main(argv=None):  # pylint: disable=unused-argument
+    runAbunch = False
+    if runAbunch:
+        for entry in yuvfileslist:
+            FLAGS.data_dir = entry[0]
+            FLAGS.yuvfile = entry[1]
+            FLAGS.heatmap = entry[2]
+            doEverything()
+    else:
+        doEverything()
 
 if __name__ == '__main__':
     tf.app.run()
