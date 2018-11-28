@@ -32,6 +32,7 @@ import itNet_input
 import patchIt2 as pi
 import functions
 import matplotlib.pyplot as plt
+import glob
 from sklearn.cluster import KMeans
 
 FLAGS = tf.app.flags.FLAGS
@@ -249,12 +250,21 @@ def predictNumPatches(fileSize, cropDim, tempStep, spacStep, height, width):
     patchedFrames = num_frames // tempStep
     patchWidth = (width - cropDim)//spacStep
     patchHeight = (height - cropDim)//spacStep
+
+    # This feels like a hack...
+    if (width % 16) != 0:
+        patchWidth = patchWidth + 1
+    if (height % 16) != 0:
+        patchHeight = patchHeight + 1
+
     numPatches = patchedFrames * patchWidth * patchHeight
     return numPatches
 
 def deriveMaskFilename(filename):
     if "Davino" in filename or "VTD" in filename or "SULFA" in filename:
         maskfilename = filename.replace("_f.yuv", "_mask.yuv")
+    if "realisticTampering" in filename:
+        maskfilename = filename.replace("all", "mask")
 
     return maskfilename
 
@@ -272,13 +282,13 @@ def doEverything():
     doHeatmaps = False
     multiTruncatedOutput = False
 
-    #doPatching = True
-    #doEvaluation = True
+    doPatching = True
+    doEvaluation = True
     doClustering = True
     #doFrameAnalysis = True
-    doYUVSummary = True
+    #doYUVSummary = True
     doGroundTruthProcessing = True
-    doIOU = True
+    #doIOU = True
     doHeatmaps = True
     #multiTruncatedOutput = True
 
@@ -320,6 +330,12 @@ def doEverything():
     predsWidth = (width - cropDim) // cropSpacStep
     predsHeight = (height - cropDim) // cropSpacStep
 
+    # This feels like a hack...
+    if (width % 16) != 0:
+        predsWidth = predsWidth + 1
+    if (height % 16) != 0:
+        predsHeight = predsHeight + 1
+
     networks = [qpNetwork, ipNetwork, deblockNetwork]
 
 
@@ -329,7 +345,7 @@ def doEverything():
     frameSize = width * height
     numFrames = int((fileSize // (frameSize * 3 / 2)) // cropTempStep)
 
-    print(numPatches)
+    print("Predicted {} patches".format(numPatches))
 
 
     # pi.patchOneFile(fileIn=inFilename, fileOut=outFilename, label="qp",
@@ -370,7 +386,7 @@ def doEverything():
 
     if doClustering:
         print("Begin combination of preds")
-
+        kmeansClustering = True
         if kmeansClustering:
             allPreds = []
             clusteredNetworks = [qpNetwork, deblockNetwork]
@@ -414,7 +430,7 @@ def doEverything():
         patchFrame = patchHeight * patchWidth
 
         #clusteredNetworks = [qpNetwork, deblockNetwork]
-        clusteredNetworks = [qpNetwork,]
+        clusteredNetworks = [qpNetwork, deblockNetwork, ipNetwork]
         keyFrames = []
         for i, network in enumerate(clusteredNetworks):
             predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
@@ -422,12 +438,20 @@ def doEverything():
             predVals = predVals[0:numPatches]
             predVals = (predVals / np.linalg.norm(predVals))*100 # normalising
             predVals = predVals.reshape(numFrames,patchFrame)
+
+            # discard the last frame because it fades to black and is nonsense
+            predVals = np.append(predVals[0:(numFrames-2), :], predVals[(numFrames-4):(numFrames-2), :]).reshape(numFrames,patchFrame)
+
             avgs = predVals.mean(axis=1)*1000
+            #print(avgs)
+            #for j, k in enumerate(avgs):
+            #    print("{}     {}".format(j, k))
+
             #print(avgs)
             plotDiff = True
             if plotDiff:
                 avgs = np.diff(avgs)
-                avgs = np.insert(avgs, 0, avgs[0]).reshape(-1, 1)
+                avgs = np.insert(avgs, 0, avgs[0]).reshape(-1, 1) # to align it to frame numbers, insert 0 at front
                 frames = range(0, numFrames)
             else:
                 avgs = avgs.reshape(-1, 1)
@@ -439,19 +463,43 @@ def doEverything():
             plt.title("Frame average for {}".format(network['predFilename']))
             plt.xlabel("Frame number")
             plt.ylabel("Average value from {}".format(network['predFilename']))
-            plt.savefig("a_{}.png".format(network['summary']))
+            filename = os.path.join(myHeatmapFileDir, "a_{}".format(network['summary']))
+            plt.savefig(filename)
             plt.close()
-            model = KMeans(n_clusters=2)
-            model.fit(avgs)
-            frameTypes = model.predict(avgs)
-            # Now make sure the minority class (the key frames) is always 1
-            numOnes = len(np.where(frameTypes == 1))
-            numZeros = len(np.where(frameTypes == 1))
-            if numOnes > numZeros:
-                print("Inverting binary matrix, but this might not work!")
-                frameTypes = 1 - frameTypes
-            mylist = np.where(frameTypes == 1)
-            keyFrames.append(mylist[0].tolist())
+
+            if i == 0:
+                faTotals = avgs
+            else:
+                faTotals = np.multiply(avgs, faTotals)
+
+        plt.plot(frames, faTotals)
+        plt.title("Frame totals for all")
+        plt.xlabel("Frame number")
+        plt.ylabel("Average value from all")
+        filename = os.path.join(myHeatmapFileDir, "a_all")
+        plt.savefig(filename)
+        plt.close()
+
+        model = KMeans(n_clusters=2)
+        model.fit(faTotals)
+        frameTypes = model.predict(faTotals)
+        # Now make sure the minority class (the key frames) is always 1
+        numOnes = len(np.where(frameTypes == 1))
+        numZeros = len(np.where(frameTypes == 1))
+        if numOnes > numZeros:
+            print("Inverting binary matrix, but this might not work!")
+            frameTypes = 1 - frameTypes
+        mylist = np.where(frameTypes == 1)
+        # To hell with this clustering, lets just go with stats!
+
+        mean = np.mean(faTotals)
+        stdDev = np.std(faTotals)
+        mylist = np.where(abs(faTotals) > (mean + 2*stdDev))
+
+
+
+        keyFrames = keyFrames + (mylist[0].tolist())
+        print(keyFrames)
 
         keyFrames = np.asarray(keyFrames)
         #print(keyFrames)
@@ -459,6 +507,7 @@ def doEverything():
         #print(keyFrames)
         keyFrames = np.unique(keyFrames)
         print("End of frame analysis")
+
 
     if doYUVSummary:
         print("Summarising YUV and mask files with key frames {}".format(keyFrames))
@@ -480,17 +529,26 @@ def doEverything():
                 theFrame = mybytes[start:end]
                 functions.appendToFile(theFrame, keyframesFilename)
         print("End of YUV summarising")
-
-
-
-
-
+    else:
+        keyFrames = np.asarray(range(0, numFrames))
 
     if doGroundTruthProcessing:
         print("Turning mask file {} into a pred csv".format(maskFilename))
         fs = int(height * width * 3 / 2)
         with open(maskFilename, "rb") as f:
             mybytes = np.fromfile(f, 'u1')
+
+        # check on number of frames:
+        maskNumFrames = mybytes.shape[0] // fs
+        if maskNumFrames > numFrames:
+            mybytes = mybytes[0:(numFrames*fs)]
+        if maskNumFrames < numFrames:
+            diff = numFrames - maskNumFrames
+            # Just append a few frames on the end....
+            mybytes = np.append(mybytes, mybytes[0:(diff * fs)])
+
+        #quit()
+        print("Numframes {} vs mask frames {}".format(numFrames, maskNumFrames))
 
         mybytes = mybytes.reshape((numFrames, fs))
         mybytes = mybytes[:, 0:frameSize] # Take only Y component
@@ -503,7 +561,8 @@ def doEverything():
                     xend = x + cropSpacStep
                     patch = mybytes[f, y:yend, x:xend]
                     patch = patch.flatten()
-                    patch = patch - 16
+                    if "VTD" in maskFilename:
+                        patch = patch - 16
                     #print("The patch is")
                     #print(patch)
 
@@ -514,7 +573,7 @@ def doEverything():
 
                     patchesList.append(label)
         patches = np.asarray(patchesList)
-        #print("There are {} patches from a {} by {} file".format(patches.shape, width, height))
+        print("There are {} patches from a {} by {} file".format(patches.shape, width, height))
         np.savetxt(gtCSV, patches, delimiter=',', fmt='%1.0f')
         print("Finished turning mask.yuv into gt.csv")
 
@@ -572,6 +631,9 @@ def doEverything():
         print("Begin generating heatmaps")
         for generateAll in [0, 1, 2]:
             for network in networks:
+                # This is because we're using 8 labels.
+                multiplier = 256 // network['num_classes']
+
                 if generateAll == 0:
                     predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
                     myHeatmapFileName = "{}.yuv".format(network['summary'])
@@ -583,6 +645,7 @@ def doEverything():
                 else: # the ground truth
                     myHeatmapFileName =os.path.join(myHeatmapFileDir, "gt_blocked.yuv")
                     predVals = np.loadtxt(gtCSV)
+                    multiplier = 255
 
                 print(predVals.shape)
                 predVals = predVals[0:numPatches]
@@ -597,11 +660,12 @@ def doEverything():
 
                 predsPerFrame = predVals.shape[0] // numFrames
                 # print(predVals.reshape((predsHeight, predsWidth)))
-                print("numFrames {} predsWidth {} predsHeight {} predsPerFrame {}".format(numFrames, predsWidth, predsHeight,
+                print("numFrames {} predsWidth {} predsHeight {} predsPerFrame {}".format(numFrames,
+                                                                                          predsWidth,
+                                                                                          predsHeight,
                                                                                           predsPerFrame))
 
-                # This is because we're using 8 labels.
-                multiplier = 256 // network['num_classes']
+
                 predVals = predVals * multiplier
                 padding = cropDim // 2
 
@@ -615,6 +679,8 @@ def doEverything():
                     framePreds = framePreds.reshape((predsHeight, predsWidth))
                     framePreds = framePreds.repeat(cropSpacStep, axis=0).repeat(cropSpacStep, axis=1)
                     framePreds = np.pad(framePreds, ((padding, padding), (padding, padding)), 'edge')
+                    # Caution - this only works if it's the height that's a non-16 multiple
+                    framePreds = framePreds[:height, :width]
                     functions.appendToFile(framePreds, myHeatmapFileName)
                     functions.appendToFile(uv, myHeatmapFileName)
 
@@ -634,16 +700,37 @@ def doEverything():
     if tf.gfile.Exists(FLAGS.eval_dir):
         tf.gfile.DeleteRecursively(FLAGS.eval_dir)
 
+def getAverageQPinCSVs(dir):
+    print(dir)
+    csvlist = glob.glob(os.path.join(dir, "*", "qpPred.csv"))
+    print(csvlist)
+    avgs = []
+    avgTotal = 0
+    for csv in csvlist:
+        vals = np.loadtxt(csv)
+        avg = np.average(vals)
+        avgTotal = avgTotal + avg
+        avgs = np.append(avgs, avg)
+    finalAverage = avgTotal/len(csvlist)
+    avgs = np.asarray(avgs)
 
-yuvfileslist =[
-    #["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_f.yuv", "/Users/pam/Documents/results/Davino/tank"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_f.yuv", "/Users/pam/Documents/results/Davino/man"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_f.yuv", "/Users/pam/Documents/results/Davino/helicopter"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_f.yuv", "/Users/pam/Documents/results/Davino/hen"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "06_LION_f.yuv", "/Users/pam/Documents/results/Davino/lion"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_f.yuv", "/Users/pam/Documents/results/Davino/ufo"],
-    #["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree"],
+    a = np.average(avgs)
+    std = np.std(avgs)
+    return a, std
+
+
+
+
+
+yuvfileslist_video =[
+    ["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_f.yuv", "/Users/pam/Documents/results/Davino/tank"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_f.yuv", "/Users/pam/Documents/results/Davino/man"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_f.yuv", "/Users/pam/Documents/results/Davino/helicopter"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_f.yuv", "/Users/pam/Documents/results/Davino/hen"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "06_LION_f.yuv", "/Users/pam/Documents/results/Davino/lion"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_f.yuv", "/Users/pam/Documents/results/Davino/ufo"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree"],
     ["/Users/pam/Documents/data/Davino_yuv/", "09_GIRL_f.yuv", "/Users/pam/Documents/results/Davino/girl"],
     ["/Users/pam/Documents/data/Davino_yuv/", "10_DOG_f.yuv", "/Users/pam/Documents/results/Davino/dog"],
     ["/Users/pam/Documents/data/SULFA_yuv/", "01_f.yuv", "/Users/pam/Documents/results/SULFA/01"],
@@ -658,8 +745,29 @@ yuvfileslist =[
     ["/Users/pam/Documents/data/SULFA_yuv/", "10_f.yuv", "/Users/pam/Documents/results/SULFA/10"],
 ]
 
+
+yuvfileslist =[
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_0.yuv", "/Users/pam/Documents/results/realisticTampering/0"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_1.yuv", "/Users/pam/Documents/results/realisticTampering/1"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_2.yuv", "/Users/pam/Documents/results/realisticTampering/2"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_3.yuv", "/Users/pam/Documents/results/realisticTampering/3"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_4.yuv", "/Users/pam/Documents/results/realisticTampering/4"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_5.yuv", "/Users/pam/Documents/results/realisticTampering/5"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_6.yuv", "/Users/pam/Documents/results/realisticTampering/6"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_7.yuv", "/Users/pam/Documents/results/realisticTampering/7"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_8.yuv", "/Users/pam/Documents/results/realisticTampering/8"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_9.yuv", "/Users/pam/Documents/results/realisticTampering/9"],
+    ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_10.yuv", "/Users/pam/Documents/results/realisticTampering/10"],
+]
 def main(argv=None):  # pylint: disable=unused-argument
-    runAbunch = False
+
+    #davino = getAverageQPinCSVs("/Users/pam/Documents/results/Davino/")
+    #rt = getAverageQPinCSVs("/Users/pam/Documents/results/realisticTampering/")
+    #sulfa = getAverageQPinCSVs("/Users/pam/Documents/results/SULFA/")
+    #print("Average for davino {}, realisticTampering {}, SULFA {}".format(davino, rt, sulfa))
+    #quit()
+
+    runAbunch = True
     if runAbunch:
         for entry in yuvfileslist:
             FLAGS.data_dir = entry[0]

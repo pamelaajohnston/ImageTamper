@@ -248,6 +248,7 @@ def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSp
         if qp < 0:
             qp = 0
         label = int(qp / 7)
+        label = qp
     if label == "none":
         label = 0
 
@@ -361,6 +362,21 @@ if __name__ == "__main__":
     shuffled = False
     labelwith = "deblock"
     avoidFrames=[]
+
+    summary = "intraForQp0to7"
+    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_train/quant_%d' % i for i in range(0,7) ]
+    dirs2 = ['/Volumes/LaCie/data/UCID/train/quant_%d' % i for i in range(0,7)]
+    binFileName = "train"
+    shuffled = True
+    #dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_test/quant_%d' % i for i in range(0,7)]
+    #dirs2 = ['/Volumes/LaCie/data/UCID/test/quant_%d' % i for i in range(0,7) ]
+    #binFileName = "test"
+    #shuffled = False
+    dirs = dirs + dirs2
+    labelwith = "qp"
+    avoidFrames=[]
+
+
 
     #dirs = ['/Users/pam/Documents/data/testyuv']
 
