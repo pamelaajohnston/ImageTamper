@@ -63,7 +63,7 @@ NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 49343
 
 
 # Number of classes
-NUM_CLASSES = 8
+NUM_CLASSES = 7
 #NUM_CLASSES = 2
 # This is the number of training examples in the dataset - one epoch runs over all the examples
 
