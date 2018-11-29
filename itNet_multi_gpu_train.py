@@ -225,8 +225,8 @@ def train():
 
     # Create an optimizer that performs gradient descent.
     if FLAGS.optimizer == 0:
-        opt = tf.train.AdamOptimizer(0.00001) # worked-ish for I/P classification.
-        #opt = tf.train.AdamOptimizer()
+        #opt = tf.train.AdamOptimizer(0.00001) # worked-ish for I/P classification.
+        opt = tf.train.AdamOptimizer()
     else:
         opt = tf.train.GradientDescentOptimizer(lr)
     #opt = tf.train.RMSPropOptimizer(lr)
