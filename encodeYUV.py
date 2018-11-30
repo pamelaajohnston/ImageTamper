@@ -38,6 +38,7 @@ quants = [0, 6, 12, 18, 24, 30, 36, 42, 48]
 quantDiv = 7
 quants = [0, 7, 14, 21, 28, 35, 42, 49]
 quants = [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13]
+quants = [15, 18]
 testfileNames = ["bus_cif", "flower_cif", "news_cif", "news_qcif", "tempete_cif"]
 
 def getFile_Name_Width_Height(fileName):
@@ -372,7 +373,8 @@ def encodeAWholeFolderOfImagesAsSingleH264Frames(myDir):
 
     quants = [0,7,14,21,28,35,42,49]
     #quants = [0,49]
-    quants = [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13]
+    #quants = [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13]
+    quants = [15, 18]
     for quant in quants:
         # make a directory
         dirName = "quant_{}".format(quant)
@@ -887,7 +889,7 @@ if __name__ == "__main__":
     #main_2()
 
     # For UCID - all of these will be intra frames!
-    encodeAllOfUCID()
+    #encodeAllOfUCID()
     #main_UCID()
     #createPatches()
 
@@ -896,7 +898,7 @@ if __name__ == "__main__":
     #allVid_smallerPatches()
 
     # Trying out an intra-only dataset
-    #encodeVidIntraFrames()
+    encodeVidIntraFrames()
     #cifVidIntra_smallerPatches()
     #allVidIntra_smallerPatches()
     #allVidIntra_Patches()

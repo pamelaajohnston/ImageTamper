@@ -261,6 +261,7 @@ def predictNumPatches(fileSize, cropDim, tempStep, spacStep, height, width):
     return numPatches
 
 def deriveMaskFilename(filename):
+    maskfilename = filename.replace(".yuv", "_mask.yuv")
     if "Davino" in filename or "VTD" in filename or "SULFA" in filename:
         maskfilename = filename.replace("_f.yuv", "_mask.yuv")
     if "realisticTampering" in filename:
@@ -268,10 +269,121 @@ def deriveMaskFilename(filename):
 
     return maskfilename
 
+def frameDiffs(infilename, graphname, width, height, csvname):
+    sigmas = 2.15 # more than 2 sigmas different from average gives a key frame
+    with open(infilename, "rb") as f:
+        mybytes = np.fromfile(f, 'u1')
+    #print("There are {} bytes in the file width: {} height: {}".format(len(mybytes), width, height))
+    frameSize = int((width * height) * 3/2) # assuming yuv 420
+    num_frames = int(len(mybytes) / frameSize)
+    #print("There are {} frames".format(num_frames))
+
+    pixels = mybytes.reshape((num_frames, frameSize))
+    frameDeltas = np.diff(pixels, axis=0)
+    #frameDeltasNonabs = frameDeltas
+    frameDeltas = abs(frameDeltas)
+    #if not np.array_equal(frameDeltas, frameDeltasNonabs):
+    #    print("YEAH there is a mistake")
+    #    print(frameDeltas)
+    #    print(frameDeltasNonabs)
+    avgs = np.average(frameDeltas, axis=1)
+    # normalise
+    avgsavg = np.average(avgs)
+    avgsstd = np.std(avgs)
+    scores = abs(avgs-avgsavg)/avgsstd # or a "standard score"
+    avgs = scores
+    avgs = np.insert(avgs, 0, sigmas).reshape(-1, 1) # ???!!!insert sigmas since first frame will usually be "key"
+    frames = range(0,num_frames)
+
+    plt.plot(frames, avgs)
+    plt.title("Frame delta average")
+    plt.xlabel("Frame number")
+    plt.ylabel("Average delta")
+    plt.savefig(graphname)
+    plt.close()
+
+    avgs = avgs.flatten()
+    interestingFrames = np.where(avgs >= sigmas)
+    print(interestingFrames)
+
+    # Now convert frameDeltas to a csv, with 1 indicating a change from previous frame and 0 otherwise
+    frameDeltas = frameDeltas.reshape((num_frames, frameSize))
+    frameDeltas = frameDeltas[:, 0:(width * height)] # WARNING - taking only the Y (not the U and V)
+    frameDeltas = frameDeltas.reshape((height, width))
+
+
+
+    return interestingFrames
+
+def getVTDselectedframes(filename):
+    if "archery" in filename:
+        return [0, 140, 160, 236, 279, 320]
+    if "audirs7" in filename:
+        return [0, 25,  81, 96, 97, 122, 144, 153, 170, 288, 380]
+    if "basketball" in filename:
+        return [0, 160, 320]
+    if "billiards" in filename:
+        return [0, 15, 79, 160, 210, 299, 320, 385]
+    if "bowling" in filename:
+        return [0, 135, 137, 160, 162, 163, 165, 175, 177, 185, 250, 251, 320]
+    if "bullet" in filename:
+        return [0,   1,   2,   5,  75, 144, 195, 205, 206, 209, 220, 224, 288, 301, 304, 321, 336]
+    if "cake" in filename:
+        return [0,  93,  95,  96,  97,  98,  99, 101, 102, 156, 160, 300, 320]
+    if "camera" in filename:
+        return [0, 160, 220, 259, 297, 320, 335, 374, 451]
+    if "carpark" in filename:
+        return [0,   1,   2,  95,  96,  97,  98, 160, 249, 280, 282, 286, 287, 288, 320, 359]
+    if "carplate" in filename:
+        return [0,   1,   3,   5,   7,  98, 144, 181, 182, 183, 186, 187, 188, 189,
+                190, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206,
+                207, 208, 209, 210, 211, 212, 213, 288, 368, 414, 415]
+    if "cctv" in filename:
+        return [0,   1,   2,  16, 120, 160, 208, 211, 213, 215, 225, 227, 229,
+       239, 270, 272, 300, 320, 384]
+    if "clarity" in filename:
+        return[0,   1,  16, 127, 160, 193, 240, 320, 352, 403, 416, 464]
+    if "cuponk" in filename:
+        return [0,  50, 144, 188, 268, 272, 274, 276, 277, 278, 279, 280, 281,
+       282, 284, 288, 321]
+    if "dahua" in filename:
+        return [0, 150, 160, 169, 170, 177, 180, 192, 216, 303, 304, 320, 358, 359]
+    if "football" in filename:
+        return [0, 160, 197, 320, 332]
+    if "highway" in filename:
+        return [0, 47, 144, 236, 288, 393, 418]
+    if "kitchen" in filename:
+        return [0,  95, 123, 126, 127, 128, 129, 130, 132, 133, 160, 255, 256,
+       258, 259, 260, 261, 320]
+    if "manstreet" in filename:
+        return [  0,   1,   4,  43,  55,  65, 160, 192, 209, 210, 235, 240, 261,
+       273, 320, 364, 415, 428]
+    if "passport" in filename:
+        return [0,  34, 144, 154, 168, 286, 288, 296, 298, 300, 355, 371, 372, 428, 430]
+    if "plane" in filename:
+        return [0,  39, 160, 189, 232, 233, 238, 239, 240, 241, 243, 244, 320, 356, 359]
+    if "pong" in filename:
+        return [0,  10,  24,  28,  32,  37,  39,  41,  44, 144, 187, 288]
+    if "studio" in filename:
+        return [0,  34,  69, 144, 229, 240, 288, 354, 366, 406]
+    if "swann" in filename:
+        return [0,  88,  89, 103, 122, 128, 160, 211, 212, 272, 273, 300, 303,
+       320, 331, 332, 422, 452]
+    if "swimming" in filename:
+        return [0, 114, 115, 116, 117, 120, 121, 122, 123, 124, 160, 320, 361, 417, 418,
+       419, 423]
+    if "whitecar" in filename:
+        return [0,   1,   2,  90, 160, 210, 278, 320, 321, 337, 359, 361]
+    if "yellowcar" in filename:
+        return [0,  48,  64,  72, 160, 320, 355, 375, 434, 435]
+
+
 
 
 #def main(argv=None):  # pylint: disable=unused-argument
 def doEverything():
+    doFrameDiffs = False
+    doSelectedFramesOnly = False
     doPatching = False
     doEvaluation = False
     doClustering = False
@@ -282,10 +394,12 @@ def doEverything():
     doHeatmaps = False
     multiTruncatedOutput = False
 
-    doPatching = True
-    doEvaluation = True
+    #doFrameDiffs = True
+    #doSelectedFramesOnly = True
+    #doPatching = True
+    #doEvaluation = True
     doClustering = True
-    #doFrameAnalysis = True
+    doFrameAnalysis = True
     #doYUVSummary = True
     doGroundTruthProcessing = True
     #doIOU = True
@@ -344,8 +458,53 @@ def doEverything():
                                    tempStep=cropTempStep, spacStep=cropSpacStep, height=height, width=width)
     frameSize = width * height
     numFrames = int((fileSize // (frameSize * 3 / 2)) // cropTempStep)
-
     print("Predicted {} patches".format(numPatches))
+
+    selectedFrames = range(0, numFrames)
+    if doFrameDiffs:
+        print("Doing frame diffs")
+        # This is just a way of finding potential key frames
+        graphName = os.path.join(myHeatmapFileDir, "a_frameDiffs")
+        csvName = os.path.join(myHeatmapFileDir, "diffs.csv")
+        selectedFrames = frameDiffs(inFilename, graphName, width, height, csvName)
+        selectedFrames = selectedFrames[0].tolist()
+        print("End of frame diffs")
+
+    if doSelectedFramesOnly:
+        selectedFrames = getVTDselectedframes(inFilename)
+        print("Doing these frames only: {} on file {}".format(selectedFrames, inFilename))
+        tempFileName = os.path.join(myHeatmapFileDir, "selectedFramesOnly{}x{}_f.yuv".format(width, height))
+        tempMaskFile = deriveMaskFilename(tempFileName)
+        # Copy the "selected frames into the temporary file
+        yuvFilesIn = [inFilename, maskFilename] # and add in ground truth mask or whatever
+        yuvFilesOut = [tempFileName, tempMaskFile]  # and add in ground truth mask or whatever
+
+        fs = int(height * width * 3 / 2)
+        for i, file in enumerate(yuvFilesIn):
+            outfile = yuvFilesOut[i]
+            print("{} going to {}".format(file, outfile))
+            if tf.gfile.Exists(outfile):
+                os.remove(outfile)
+            with open(file, "rb") as f:
+                mybytes = np.fromfile(f, 'u1')
+            for f in selectedFrames:
+                start = f * fs
+                end = start + fs
+                theFrame = mybytes[start:end]
+                functions.appendToFile(theFrame, outfile)
+        #Reset the names and continue as normal
+        inFilename = tempFileName
+        maskFilename = tempMaskFile
+        fileSize = os.path.getsize(inFilename)
+        numPatches = predictNumPatches(fileSize=fileSize, cropDim=cropDim,
+                                       tempStep=cropTempStep, spacStep=cropSpacStep, height=height, width=width)
+        frameSize = width * height
+        numFrames = int((fileSize // (frameSize * 3 / 2)) // cropTempStep)
+        print("Predicted {} patches".format(numPatches))
+        print("End of selecting frames, rehashed input yuv and mask files")
+
+
+
 
 
     # pi.patchOneFile(fileIn=inFilename, fileOut=outFilename, label="qp",
@@ -386,8 +545,9 @@ def doEverything():
 
     if doClustering:
         print("Begin combination of preds")
-        kmeansClustering = True
+        kmeansClustering = False
         if kmeansClustering:
+            print("Clustering is kmeans")
             allPreds = []
             clusteredNetworks = [qpNetwork, deblockNetwork]
             clusteredNetworks = [qpNetwork,]
@@ -412,6 +572,14 @@ def doEverything():
             all_predictions = model.predict(allPreds)
             np.savetxt(clustersCSV, all_predictions, delimiter=",", fmt='%1.0f')
             #print(all_predictions)
+        else:
+            print("Clustering is custom")
+
+
+
+
+
+
 
         print("End combination of preds")
 
@@ -466,6 +634,7 @@ def doEverything():
             filename = os.path.join(myHeatmapFileDir, "a_{}".format(network['summary']))
             plt.savefig(filename)
             plt.close()
+
 
             if i == 0:
                 faTotals = avgs
@@ -759,6 +928,35 @@ yuvfileslist =[
     ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_9.yuv", "/Users/pam/Documents/results/realisticTampering/9"],
     ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_10.yuv", "/Users/pam/Documents/results/realisticTampering/10"],
 ]
+
+yuvfileslist_VTD=[
+    ["/Users/pam/Documents/data/VTD_yuv", "cctv_f.yuv", "/Users/pam/Documents/results/VTD/cctv"],
+    ["/Users/pam/Documents/data/VTD_yuv", "studio_f.yuv", "/Users/pam/Documents/results/VTD/studio"],
+    ["/Users/pam/Documents/data/VTD_yuv", "swann_f.yuv", "/Users/pam/Documents/results/VTD/swann"],
+    ["/Users/pam/Documents/data/VTD_yuv", "carpark_f.yuv", "/Users/pam/Documents/results/VTD/carpark"],
+    ["/Users/pam/Documents/data/VTD_yuv", "bowling_f.yuv", "/Users/pam/Documents/results/VTD/bowling"],
+    ["/Users/pam/Documents/data/VTD_yuv", "dahua_f.yuv", "/Users/pam/Documents/results/VTD/dahua"],
+    ["/Users/pam/Documents/data/VTD_yuv", "clarity_f.yuv", "/Users/pam/Documents/results/VTD/clarity"],
+    ["/Users/pam/Documents/data/VTD_yuv", "kitchen_f.yuv", "/Users/pam/Documents/results/VTD/kitchen"],
+    ["/Users/pam/Documents/data/VTD_yuv", "archery_f.yuv", "/Users/pam/Documents/results/VTD/archery"],
+    ["/Users/pam/Documents/data/VTD_yuv", "basketball_f.yuv", "/Users/pam/Documents/results/VTD/basketball"],
+    ["/Users/pam/Documents/data/VTD_yuv", "billiards_f.yuv", "/Users/pam/Documents/results/VTD/billiards"],
+    ["/Users/pam/Documents/data/VTD_yuv", "bullet_f.yuv", "/Users/pam/Documents/results/VTD/bullet"],
+    ["/Users/pam/Documents/data/VTD_yuv", "cake_f.yuv", "/Users/pam/Documents/results/VTD/cake"],
+    ["/Users/pam/Documents/data/VTD_yuv", "camera_f.yuv", "/Users/pam/Documents/results/VTD/camera"],
+    ["/Users/pam/Documents/data/VTD_yuv", "carplate_f.yuv", "/Users/pam/Documents/results/VTD/carplate"],
+    ["/Users/pam/Documents/data/VTD_yuv", "cuponk_f.yuv", "/Users/pam/Documents/results/VTD/cuponk"],
+    ["/Users/pam/Documents/data/VTD_yuv", "football_f.yuv", "/Users/pam/Documents/results/VTD/football"],
+    ["/Users/pam/Documents/data/VTD_yuv", "highway_f.yuv", "/Users/pam/Documents/results/VTD/highway"],
+    ["/Users/pam/Documents/data/VTD_yuv", "manstreet_f.yuv", "/Users/pam/Documents/results/VTD/manstreet"],
+    ["/Users/pam/Documents/data/VTD_yuv", "passport_f.yuv", "/Users/pam/Documents/results/VTD/passport"],
+    ["/Users/pam/Documents/data/VTD_yuv", "plane_f.yuv", "/Users/pam/Documents/results/VTD/plane"],
+    ["/Users/pam/Documents/data/VTD_yuv", "pong_f.yuv", "/Users/pam/Documents/results/VTD/pong"],
+    ["/Users/pam/Documents/data/VTD_yuv", "swimming_f.yuv", "/Users/pam/Documents/results/VTD/swimming"],
+    ["/Users/pam/Documents/data/VTD_yuv", "whitecar_f.yuv", "/Users/pam/Documents/results/VTD/whitecar"],
+    ["/Users/pam/Documents/data/VTD_yuv", "yellowcar_f.yuv", "/Users/pam/Documents/results/VTD/yellowcar"],
+    ["/Users/pam/Documents/data/VTD_yuv", "audirs7_f.yuv", "/Users/pam/Documents/results/VTD/audirs7"],
+]
 def main(argv=None):  # pylint: disable=unused-argument
 
     #davino = getAverageQPinCSVs("/Users/pam/Documents/results/Davino/")
@@ -767,9 +965,9 @@ def main(argv=None):  # pylint: disable=unused-argument
     #print("Average for davino {}, realisticTampering {}, SULFA {}".format(davino, rt, sulfa))
     #quit()
 
-    runAbunch = True
+    runAbunch = False
     if runAbunch:
-        for entry in yuvfileslist:
+        for entry in yuvfileslist_VTD:
             FLAGS.data_dir = entry[0]
             FLAGS.yuvfile = entry[1]
             FLAGS.heatmap = entry[2]

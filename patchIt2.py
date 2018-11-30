@@ -231,6 +231,8 @@ def getLabelFromFileName(vid, labelwith):
         qp = getQuantFromFileName(vid)
         label = qp
         #label = int(qp / 7)
+        label = int(qp / 2)
+        label = int(qp / 3)
     if labelwith == "intraFrame":
         print("label intra or not")
         label = getIntraFromFileName(vid)
@@ -250,6 +252,8 @@ def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSp
             qp = 0
         label = int(qp / 7)
         label = qp
+        label = int(qp / 2)
+        label = int(qp / 3)
         print(label)
     if label == "none":
         label = 0
@@ -378,6 +382,32 @@ if __name__ == "__main__":
     labelwith = "qp"
     avoidFrames=[]
 
+    summary = "intraForQp0to14"
+    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_train/quant_%d' % i for i in
+            range(0, 14, 2)]
+    dirs2 = ['/Volumes/LaCie/data/UCID/train/quant_%d' % i for i in range(0, 14, 2)]
+    binFileName = "train"
+    shuffled = True
+    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_test/quant_%d' % i for i in range(0, 14, 2)]
+    dirs2 = ['/Volumes/LaCie/data/UCID/test/quant_%d' % i for i in range(0, 14, 2)]
+    binFileName = "test"
+    shuffled = False
+    dirs = dirs + dirs2
+    labelwith = "qp"
+    avoidFrames = []
+
+    summary = "intraForQp0to21"
+    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_train/quant_%d' % i for i in range(0, 21, 3)]
+    dirs2 = ['/Volumes/LaCie/data/UCID/train/quant_%d' % i for i in range(0, 21, 3)]
+    binFileName = "train"
+    shuffled = True
+    dirs = ['/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_intraOnly_noDeblock_test/quant_%d' % i for i in range(0, 21, 3)]
+    dirs2 = ['/Volumes/LaCie/data/UCID/test/quant_%d' % i for i in range(0, 21, 3)]
+    binFileName = "test"
+    shuffled = False
+    dirs = dirs + dirs2
+    labelwith = "qp"
+    avoidFrames = []
 
 
     #dirs = ['/Users/pam/Documents/data/testyuv']
