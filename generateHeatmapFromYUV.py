@@ -235,6 +235,14 @@ clustersNetwork = {
     "checkpoint_dir": "dummy",
     "predFilename": "clusters.csv"
 }
+frameDiffNetwork = {
+    "summary": "frameDiff",
+    "num_classes": 2,
+    "network_architecture": 28,
+    "checkpoint_dir": "dummy",
+    "predFilename": "diffs.csv"
+}
+
 
 #keyframesNetwork = {
 #    "summary": "keyframes",
@@ -269,7 +277,7 @@ def deriveMaskFilename(filename):
 
     return maskfilename
 
-def frameDiffs(infilename, graphname, width, height, csvname):
+def frameDiffs(infilename, graphname, width, height, cropDim, cropTempStep, cropSpacStep, csvname):
     sigmas = 2.15 # more than 2 sigmas different from average gives a key frame
     with open(infilename, "rb") as f:
         mybytes = np.fromfile(f, 'u1')
@@ -296,7 +304,7 @@ def frameDiffs(infilename, graphname, width, height, csvname):
     frames = range(0,num_frames)
 
     plt.plot(frames, avgs)
-    plt.title("Frame delta average")
+    plt.title("Mean Frame Delta")
     plt.xlabel("Frame number")
     plt.ylabel("Average delta")
     plt.savefig(graphname)
@@ -304,13 +312,51 @@ def frameDiffs(infilename, graphname, width, height, csvname):
 
     avgs = avgs.flatten()
     interestingFrames = np.where(avgs >= sigmas)
-    print(interestingFrames)
+    #print(interestingFrames)
 
     # Now convert frameDeltas to a csv, with 1 indicating a change from previous frame and 0 otherwise
+    # This doesn't work because it's one less frame - pad it out with a frame and also, add another nested for
+    # for frames!!!!!!!!!
+    frameDeltas = frameDeltas.flatten()
+    # pad it
+    zeroFrame = np.zeros(frameSize)
+    frameDeltas = np.append(zeroFrame, frameDeltas)
     frameDeltas = frameDeltas.reshape((num_frames, frameSize))
     frameDeltas = frameDeltas[:, 0:(width * height)] # WARNING - taking only the Y (not the U and V)
-    frameDeltas = frameDeltas.reshape((height, width))
+    frameDeltas = frameDeltas.reshape((num_frames, height, width))
 
+    # The +1's here are to give extra room for frames that aren't a multiple of 16
+    mbDiffs = np.zeros((num_frames, ((height//cropSpacStep)+1), ((width//cropSpacStep))+1), dtype="float32")
+    border = 0
+    #border = int(((cropDim/2)//cropSpacStep)*cropSpacStep)
+    #print("The border is {}".format(border))
+    print(mbDiffs.shape)
+    print(cropSpacStep)
+
+    for f in range(0, num_frames, cropTempStep):
+        for j in range(border, (height - border), cropSpacStep):
+            for i in range(border, (width - border), cropSpacStep):
+                ii = (i-border)//cropSpacStep
+                jj = (j-border)//cropSpacStep
+                myTile = frameDeltas[f, j:(j+cropSpacStep), i:(i+cropSpacStep)]
+                total = np.sum(myTile)
+                #print("Frame {}, ({}, {}), total: {} going to csv ({}, {})".format(f, i, j, total, ii, jj))
+                if total > 0:
+                    #print("Frame {}, ({}, {}), total: {} going to csv ({}, {})".format(f, i, j, total, ii, jj))
+                    mbDiffs[f, jj, ii] = int(1)
+
+    # This is where we adjust for the patch/stride stuff)
+    bordermbs = int(((cropDim/2)//cropSpacStep))
+    #print(bordermbs)
+    #print(((height//16) - bordermbs))
+    #print(((width//16) - bordermbs))
+    mbDiffs = mbDiffs[:, bordermbs:((height//cropSpacStep) - bordermbs)-1, bordermbs:((width//cropSpacStep) - bordermbs)-1]
+    print(mbDiffs.shape)
+
+
+    mbDiffs = mbDiffs.flatten()
+
+    np.savetxt(csvname, mbDiffs, delimiter=",", fmt='%1.0f')
 
 
     return interestingFrames
@@ -380,8 +426,7 @@ def getVTDselectedframes(filename):
 
 
 
-#def main(argv=None):  # pylint: disable=unused-argument
-def doEverything():
+def doEverything(resultsLog):
     doFrameDiffs = False
     doSelectedFramesOnly = False
     doPatching = False
@@ -390,6 +435,7 @@ def doEverything():
     doFrameAnalysis = False
     doYUVSummary = False
     doGroundTruthProcessing = False
+    doAverages = False
     doIOU = False
     doHeatmaps = False
     multiTruncatedOutput = False
@@ -398,12 +444,13 @@ def doEverything():
     #doSelectedFramesOnly = True
     #doPatching = True
     #doEvaluation = True
-    doClustering = True
-    doFrameAnalysis = True
+    #doClustering = True
+    #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
     #doYUVSummary = True
-    doGroundTruthProcessing = True
+    #doGroundTruthProcessing = True
+    doAverages = True
     #doIOU = True
-    doHeatmaps = True
+    #doHeatmaps = True
     #multiTruncatedOutput = True
 
     numPatches = 0
@@ -432,8 +479,10 @@ def doEverything():
     print(maskFilename)
     clustersCSV = os.path.join(myHeatmapFileDir, "clusters.csv")
     gtCSV = os.path.join(myHeatmapFileDir, "gt.csv")
+    diffsCSV = os.path.join(myHeatmapFileDir, "diffs.csv")
 
     width, height = pi.getDimsFromFileName(inFilename)
+    print(width,height)
 
     cropDim = FLAGS.cropDim
     cropTempStep = FLAGS.cropTempStep
@@ -465,8 +514,7 @@ def doEverything():
         print("Doing frame diffs")
         # This is just a way of finding potential key frames
         graphName = os.path.join(myHeatmapFileDir, "a_frameDiffs")
-        csvName = os.path.join(myHeatmapFileDir, "diffs.csv")
-        selectedFrames = frameDiffs(inFilename, graphName, width, height, csvName)
+        selectedFrames = frameDiffs(inFilename, graphName, width, height, cropDim, cropTempStep, cropSpacStep, diffsCSV)
         selectedFrames = selectedFrames[0].tolist()
         print("End of frame diffs")
 
@@ -545,12 +593,16 @@ def doEverything():
 
     if doClustering:
         print("Begin combination of preds")
-        kmeansClustering = False
+        print("Predswidth {} predsheigh {} numPatches {}".format(predsWidth, predsHeight, numPatches))
+        kmeansClustering = True
+        perFrame = False
         if kmeansClustering:
             print("Clustering is kmeans")
             allPreds = []
             clusteredNetworks = [qpNetwork, deblockNetwork]
-            clusteredNetworks = [qpNetwork,]
+            clusteredNetworks = [qpNetwork, frameDiffNetwork]
+            #clusteredNetworks = [qpNetwork]
+            #clusteredNetworks = [frameDiffNetwork]
             for network in clusteredNetworks:
                 predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
                 predVals = np.loadtxt(predFilename)
@@ -560,16 +612,38 @@ def doEverything():
 
             allPreds = np.asarray(allPreds)
             allPreds = allPreds.flatten()
+            print(len(clusteredNetworks))
             allPreds = allPreds.reshape(len(clusteredNetworks), numPatches)
             allPreds = np.swapaxes(allPreds, 0, 1)
             #print(allPreds)
-            model = KMeans(n_clusters=2)
+            if perFrame:
+                allPreds = allPreds.reshape((numFrames, (predsHeight*predsWidth),  len(clusteredNetworks)))
+                #all_predictions = []
+                for f in range(0,numFrames):
+                    myPreds = allPreds[f, :, :]
+                    model = KMeans(n_clusters=2)
+                    # Fitting Model
+                    model.fit(myPreds)
+                    # Prediction on the entire data
+                    if f==0:
+                        all_predictions = model.predict(myPreds)
+                    else:
+                        all_predictions = np.append(all_predictions, model.predict(myPreds))
 
-            # Fitting Model
-            model.fit(allPreds)
 
-            # Prediction on the entire data
-            all_predictions = model.predict(allPreds)
+            else:
+                model = KMeans(n_clusters=2)
+                # Fitting Model
+                model.fit(allPreds)
+                # Prediction on the entire data
+                all_predictions = model.predict(allPreds)
+
+            # now all_predictions is either 0 or 1. Assume that "tampered"(1) is the minority class
+            t = all_predictions.sum()
+            print("Sum {} vs length {}".format(t, all_predictions.shape[0]))
+            #if t > all_predictions.shape[0]:
+            #    all_predictions = np.add(all_predictions, -1)
+
             np.savetxt(clustersCSV, all_predictions, delimiter=",", fmt='%1.0f')
             #print(all_predictions)
         else:
@@ -591,15 +665,17 @@ def doEverything():
 
 
     keyFrames = np.asarray(range(0, numFrames))
+    interestingFrames = keyFrames
     if doFrameAnalysis:
         print("Doing frame analysis")
-        patchWidth = (width - cropDim) // cropSpacStep
-        patchHeight = (height - cropDim) // cropSpacStep
-        patchFrame = patchHeight * patchWidth
+        #patchWidth = (width - cropDim) // cropSpacStep
+        #patchHeight = (height - cropDim) // cropSpacStep
+        #patchFrame = patchHeight * patchWidth
+        patchFrame = predsHeight * predsWidth
 
         #clusteredNetworks = [qpNetwork, deblockNetwork]
         clusteredNetworks = [qpNetwork, deblockNetwork, ipNetwork]
-        keyFrames = []
+        keyFrames = [0,]
         for i, network in enumerate(clusteredNetworks):
             predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
             predVals = np.loadtxt(predFilename)
@@ -617,6 +693,8 @@ def doEverything():
 
             #print(avgs)
             plotDiff = True
+            #if network['summary'] == "ip":
+            #    plotDiff = False
             if plotDiff:
                 avgs = np.diff(avgs)
                 avgs = np.insert(avgs, 0, avgs[0]).reshape(-1, 1) # to align it to frame numbers, insert 0 at front
@@ -628,9 +706,14 @@ def doEverything():
             #print("Here's the diffs for {}".format(network['summary']))
             #print(avgs)
             plt.plot(frames, avgs)
-            plt.title("Frame average for {}".format(network['predFilename']))
+            plt.title("Frame average for predicted {}".format(network['summary']))
             plt.xlabel("Frame number")
-            plt.ylabel("Average value from {}".format(network['predFilename']))
+            plt.ylabel("Average value of {}".format(network['summary']))
+            plt.tick_params(
+                axis='y',  # changes apply to the x-axis
+                which='both',  # both major and minor ticks are affected
+                left=False,  # ticks along the left edge are off
+                labelleft=False)  # labels along the bottom edge are off
             filename = os.path.join(myHeatmapFileDir, "a_{}".format(network['summary']))
             plt.savefig(filename)
             plt.close()
@@ -645,6 +728,11 @@ def doEverything():
         plt.title("Frame totals for all")
         plt.xlabel("Frame number")
         plt.ylabel("Average value from all")
+        plt.tick_params(
+            axis='y',  # changes apply to the x-axis
+            which='both',  # both major and minor ticks are affected
+            left=False,  # ticks along the left edge are off
+            labelleft=False)  # labels along the bottom edge are off
         filename = os.path.join(myHeatmapFileDir, "a_all")
         plt.savefig(filename)
         plt.close()
@@ -668,14 +756,24 @@ def doEverything():
 
 
         keyFrames = keyFrames + (mylist[0].tolist())
-        print(keyFrames)
+        # Remove "pairs" (because working on deltas means you detect I->P and sometimes P->I?
+        remove_indices = []
+        for i, k in enumerate(keyFrames[1:]):
+            if keyFrames[i-1] == (keyFrames[i] - 1):
+                keyFrames[i] = 0
+
+
 
         keyFrames = np.asarray(keyFrames)
         #print(keyFrames)
         keyFrames = keyFrames.flatten()
         #print(keyFrames)
         keyFrames = np.unique(keyFrames)
+        interestingFrames = keyFrames
+        print("The key frames for {}: {}".format(myHeatmapFileDir, keyFrames))
         print("End of frame analysis")
+
+
 
 
     if doYUVSummary:
@@ -730,7 +828,7 @@ def doEverything():
                     xend = x + cropSpacStep
                     patch = mybytes[f, y:yend, x:xend]
                     patch = patch.flatten()
-                    if "VTD" in maskFilename:
+                    if "Davino" in maskFilename:
                         patch = patch - 16
                     #print("The patch is")
                     #print(patch)
@@ -746,6 +844,46 @@ def doEverything():
         np.savetxt(gtCSV, patches, delimiter=',', fmt='%1.0f')
         print("Finished turning mask.yuv into gt.csv")
 
+    if doAverages:
+        print("Doing Averages")
+        # First check that the mask is available:
+        if not os.path.isfile(gtCSV):
+            print("The ground truth file {} does not exist".format(gtCSV))
+
+        filesToCheck = [qpNetwork['predFilename'], diffsCSV]
+        predsPerFrame = predsWidth * predsHeight
+        totalPreds = predsPerFrame * keyFrames.shape[0]
+
+        gtVals = np.loadtxt(gtCSV)
+        gtVals = gtVals[0:totalPreds]
+
+        for file in filesToCheck:
+            predFilename = os.path.join(myHeatmapFileDir, file)
+            predVals = np.loadtxt(predFilename)
+            predVals = predVals[0:totalPreds]
+
+            a_all = np.average(predVals)
+            print("Overall average for {} is {}".format(file, a_all))
+            a_mask0 = np.average(predVals[np.where(gtVals == 0)])
+            print("Length = {}".format(len(a_mask0)))
+            print(a_mask0)
+            a_mask1 = np.average(predVals[np.where(gtVals == 1)])
+            print("Length = {}".format(len(a_mask1)))
+            print(a_mask1)
+            if not doFrameAnalysis or (keyFrames.shape[0] == interestingFrames.shape[0]):
+                print("WARNING:!!!! Your results will be awful as you're not isolating key frames....!!!!!")
+
+            n0, bins0, patches0 = plt.hist(a_mask0, 50, facecolor='blue')
+            n1, bins1, patches1 = plt.hist(a_mask1, 50, facecolor='yellow')
+            plt.title("Mask Histogram")
+            plt.xlabel("Predicted QP")
+            plt.ylabel("Frequency")
+            filename = os.path.join(myHeatmapFileDir, "a_mask_hist")
+            plt.savefig(filename)
+            plt.close()
+
+        print("Finished doing averages")
+
     if doIOU:
         print("Comparing gt.csv and clusters.csv using Intersection over Union")
         iouResult = 0
@@ -757,30 +895,90 @@ def doEverything():
         gtVals = gtVals[0:totalPreds]
         predVals = np.loadtxt(clustersCSV)
         predVals = predVals[0:totalPreds]
+
+        if not doYUVSummary:
+            print("We didn't summarise earlier so doing it now")
+            if not doFrameAnalysis or (keyFrames.shape[0] == interestingFrames.shape[0]):
+                print("WARNING:!!!! Your results will be awful as you're not isolating key frames....!!!!!")
+            gtKeyVals = np.zeros((interestingFrames.shape[0], predsPerFrame))
+            predKeyVals = np.zeros((interestingFrames.shape[0], predsPerFrame))
+            gtVals = gtVals.reshape(keyFrames.shape[0], predsPerFrame)
+            predVals = predVals.reshape(keyFrames.shape[0], predsPerFrame)
+
+            for i,f in enumerate(interestingFrames):
+                gtKeyVals[i, :] = gtVals[f, :]
+                predKeyVals[i, :] = predVals[f, :]
+            gtVals = gtKeyVals.flatten()
+            predVals = predKeyVals.flatten()
+            print("Reducto!")
+
+        #print(predVals.shape)
+
         gtVals = gtVals != 0
-        np.set_printoptions(threshold=np.nan)
+        #np.set_printoptions(threshold=np.nan)
         #print(gtVals)
         predVals = predVals != 0
         #print(predVals)
 
         intersect = gtVals & predVals
+        #print(intersect)
         intersect = np.count_nonzero(intersect, axis=0)
         #print(intersect)
         union = gtVals | predVals
         union = np.count_nonzero(union, axis=0)
         #print(union)
 
-        if union == 0:
+        if union.all() == 0:
             iouResult = 0
         else:
             iouResult = intersect / union
 
+        # This is lazy and you should use your brain
+        tp = 0
+        tn = 0
+        fp = 0
+        fn = 0
+        #print(gtVals)
+        for i in range(0, gtVals.shape[0]):
+            gtVal = gtVals[i]
+            predVal = predVals[i]
+            if [gtVal, predVal] == [True, True]:
+                tp = tp +1
+            if [gtVal, predVal] == [False, False]:
+                tn = tn +1
+            if [gtVal, predVal] == [True, False]:
+                fn = fn + 1
+            if [gtVal, predVal] == [False, True]:
+                fp = fp +1
 
-        print("Done the comparison. Result was IOU={} which is {} over {} for file {} for frames {}".format(iouResult,
-                                                                                                intersect,
-                                                                                                union,
-                                                                                                inFilename,
-                                                                                                keyFrames))
+        asum = (tp + fp)*(tp + fn)*(tn + fp)*(tn + fn)
+        if asum == 0:
+            mcc = -2
+        else:
+            mcc = (tp * tn - fp * fn) / math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+
+        asum = (2*tp) + fn + fp
+        if asum == 0:
+            f1 = 0
+        else:
+            f1 = (2*tp)/asum
+
+
+
+
+        print("IOU Results IOU={} which is {} over {}; tp:{}, tn:{}, fp:{}, fn:{}, mcc:{}, f1:{} "
+              "for file {} for frames {}".format(iouResult,
+                                                 intersect,
+                                                 union,
+                                                 tp,
+                                                 tn,
+                                                 fp,
+                                                 fn,
+                                                 mcc,
+                                                 f1,
+                                                 inFilename,
+                                                 interestingFrames))
+        resultsLog.write("{}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(inFilename, tp, tn, fp, fn, mcc, f1, iouResult, interestingFrames))
 
 
 
@@ -797,9 +995,14 @@ def doEverything():
 
     # Now generate the heatmap from the preds in "pred.csv"
     if doHeatmaps:
+        heatmapNetworks = [qpNetwork, ipNetwork, deblockNetwork]
         print("Begin generating heatmaps")
+        #for generateAll in [0, 1, 2, 3]:
         for generateAll in [0, 1, 2]:
-            for network in networks:
+            for network in heatmapNetworks:
+                doBorders = True
+                predsWidth = (width - cropDim) // cropSpacStep
+                predsHeight = (height - cropDim) // cropSpacStep
                 # This is because we're using 8 labels.
                 multiplier = 256 // network['num_classes']
 
@@ -811,13 +1014,23 @@ def doEverything():
                 elif generateAll == 1: # the clusters
                     myHeatmapFileName =os.path.join(myHeatmapFileDir, "clusters.yuv")
                     predVals = np.loadtxt(clustersCSV)
+                    multiplier = 255
+                elif generateAll == 2:  # the frameDiffs
+                    myHeatmapFileName = os.path.join(myHeatmapFileDir, "frameDiffs.yuv")
+                    predVals = np.loadtxt(diffsCSV)
+                    #doBorders = False
+                    multiplier = 255
                 else: # the ground truth
                     myHeatmapFileName =os.path.join(myHeatmapFileDir, "gt_blocked.yuv")
                     predVals = np.loadtxt(gtCSV)
                     multiplier = 255
 
-                print(predVals.shape)
-                predVals = predVals[0:numPatches]
+                #print(predVals.shape)
+                if doBorders:
+                    predVals = predVals[0:numPatches]
+                else:
+                    predsWidth = (width) // cropSpacStep
+                    predsHeight = (height) // cropSpacStep
 
 
                 if tf.gfile.Exists(myHeatmapFileName):
@@ -829,6 +1042,7 @@ def doEverything():
 
                 predsPerFrame = predVals.shape[0] // numFrames
                 # print(predVals.reshape((predsHeight, predsWidth)))
+                print(myHeatmapFileName)
                 print("numFrames {} predsWidth {} predsHeight {} predsPerFrame {}".format(numFrames,
                                                                                           predsWidth,
                                                                                           predsHeight,
@@ -837,6 +1051,8 @@ def doEverything():
 
                 predVals = predVals * multiplier
                 padding = cropDim // 2
+                if not doBorders:
+                    padding = 0
 
                 uvValue = 128 # this is for grey
                 uv = np.full((frameSize // 2), uvValue)
@@ -847,7 +1063,8 @@ def doEverything():
                     framePreds = predVals[predsStart:predsEnd]
                     framePreds = framePreds.reshape((predsHeight, predsWidth))
                     framePreds = framePreds.repeat(cropSpacStep, axis=0).repeat(cropSpacStep, axis=1)
-                    framePreds = np.pad(framePreds, ((padding, padding), (padding, padding)), 'edge')
+                    if doBorders:
+                        framePreds = np.pad(framePreds, ((padding, padding), (padding, padding)), 'edge')
                     # Caution - this only works if it's the height that's a non-16 multiple
                     framePreds = framePreds[:height, :width]
                     functions.appendToFile(framePreds, myHeatmapFileName)
@@ -915,7 +1132,7 @@ yuvfileslist_video =[
 ]
 
 
-yuvfileslist =[
+yuvfileslist_realisticImages =[
     ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_0.yuv", "/Users/pam/Documents/results/realisticTampering/0"],
     ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_1.yuv", "/Users/pam/Documents/results/realisticTampering/1"],
     ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_2.yuv", "/Users/pam/Documents/results/realisticTampering/2"],
@@ -930,6 +1147,7 @@ yuvfileslist =[
 ]
 
 yuvfileslist_VTD=[
+    ["/Users/pam/Documents/data/VTD_yuv", "archery_f.yuv", "/Users/pam/Documents/results/VTD/archery"],
     ["/Users/pam/Documents/data/VTD_yuv", "cctv_f.yuv", "/Users/pam/Documents/results/VTD/cctv"],
     ["/Users/pam/Documents/data/VTD_yuv", "studio_f.yuv", "/Users/pam/Documents/results/VTD/studio"],
     ["/Users/pam/Documents/data/VTD_yuv", "swann_f.yuv", "/Users/pam/Documents/results/VTD/swann"],
@@ -938,7 +1156,6 @@ yuvfileslist_VTD=[
     ["/Users/pam/Documents/data/VTD_yuv", "dahua_f.yuv", "/Users/pam/Documents/results/VTD/dahua"],
     ["/Users/pam/Documents/data/VTD_yuv", "clarity_f.yuv", "/Users/pam/Documents/results/VTD/clarity"],
     ["/Users/pam/Documents/data/VTD_yuv", "kitchen_f.yuv", "/Users/pam/Documents/results/VTD/kitchen"],
-    ["/Users/pam/Documents/data/VTD_yuv", "archery_f.yuv", "/Users/pam/Documents/results/VTD/archery"],
     ["/Users/pam/Documents/data/VTD_yuv", "basketball_f.yuv", "/Users/pam/Documents/results/VTD/basketball"],
     ["/Users/pam/Documents/data/VTD_yuv", "billiards_f.yuv", "/Users/pam/Documents/results/VTD/billiards"],
     ["/Users/pam/Documents/data/VTD_yuv", "bullet_f.yuv", "/Users/pam/Documents/results/VTD/bullet"],
@@ -955,8 +1172,192 @@ yuvfileslist_VTD=[
     ["/Users/pam/Documents/data/VTD_yuv", "swimming_f.yuv", "/Users/pam/Documents/results/VTD/swimming"],
     ["/Users/pam/Documents/data/VTD_yuv", "whitecar_f.yuv", "/Users/pam/Documents/results/VTD/whitecar"],
     ["/Users/pam/Documents/data/VTD_yuv", "yellowcar_f.yuv", "/Users/pam/Documents/results/VTD/yellowcar"],
+]
+
+yuvfileslist_VTD2 = [
     ["/Users/pam/Documents/data/VTD_yuv", "audirs7_f.yuv", "/Users/pam/Documents/results/VTD/audirs7"],
 ]
+
+yuvfileslist_theTestSet = [
+    ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_35", "flower_cif_q35.yuv", "/Users/pam/Documents/results/testSet/flower_q35"],
+    ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_35", "tempete_cif_q35.yuv", "/Users/pam/Documents/results/testSet/tempete_q35"],
+    ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_14", "flower_cif_q14.yuv", "/Users/pam/Documents/results/testSet/flower_q14"],
+    ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_14", "tempete_cif_q14.yuv", "/Users/pam/Documents/results/testSet/tempete_q14"],
+    ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_0", "flower_cif_q0.yuv", "/Users/pam/Documents/results/testSet/flower_q0"],
+    ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_0", "tempete_cif_q0.yuv", "/Users/pam/Documents/results/testSet/tempete_q0"],
+]
+justOne = [
+    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
+]
+
+def createFileList(srcDir="/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", resultsDir="/Users/pam/Documents/results/Comp"):
+    fileList = []
+    index = 0
+    # First, create a list of the files to encode, along with dimensions
+    for (dirName, subdirList, filenames) in os.walk(srcDir):
+        for filename in filenames:
+            if filename.endswith("yuv"):
+                baseFileName, ext = os.path.splitext(filename)
+                r = os.path.join(resultsDir, baseFileName)
+                tuple = [srcDir,filename,r]
+                fileList.append(tuple)
+    return fileList
+
+recomp_1 = [
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.05.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.05_q0.05.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.05_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.05_q0.1.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.05_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.05_q0.2.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.05_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.05_q0.5.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.05_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.05_q1.0.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.05_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.1.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.1_q0.05.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.1_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.1_q0.1.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.1_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.1_q0.2.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.1_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.1_q0.5.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.1_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.1_q1.0.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.1_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.2.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.2_q0.05.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.2_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.2_q0.1.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.2_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.2_q0.2.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.2_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.2_q0.5.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.2_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.2_q1.0.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.2_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.5.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.5_q0.05.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.5_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.5_q0.1.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.5_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.5_q0.2.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.5_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.5_q0.5.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.5_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q0.5_q1.0.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q0.5_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q1.0.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q1.0_q0.05.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q1.0_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q1.0_q0.1.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q1.0_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q1.0_q0.2.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q1.0_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q1.0_q0.5.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q1.0_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'bus_cif_q1.0_q1.0.yuv', '/Users/pam/Documents/results/Comp/bus_cif_q1.0_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.05.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.05_q0.05.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.05_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.05_q0.1.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.05_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.05_q0.2.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.05_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.05_q0.5.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.05_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.05_q1.0.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.05_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.1.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.1_q0.05.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.1_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.1_q0.1.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.1_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.1_q0.2.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.1_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.1_q0.5.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.1_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.1_q1.0.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.1_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.2.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.2_q0.05.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.2_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.2_q0.1.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.2_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.2_q0.2.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.2_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.2_q0.5.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.2_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.2_q1.0.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.2_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.5.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.5_q0.05.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.5_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.5_q0.1.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.5_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.5_q0.2.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.5_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.5_q0.5.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.5_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q0.5_q1.0.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q0.5_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q1.0.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q1.0_q0.05.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q1.0_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q1.0_q0.1.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q1.0_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q1.0_q0.2.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q1.0_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q1.0_q0.5.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q1.0_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'flower_cif_q1.0_q1.0.yuv', '/Users/pam/Documents/results/Comp/flower_cif_q1.0_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.05_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.05_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.05_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.05_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.05_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.05_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.05_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.05_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.05_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.05_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.1_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.1_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.1_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.1_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.1_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.1_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.1_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.1_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.1_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.1_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.2_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.2_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.2_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.2_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.2_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.2_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.2_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.2_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.2_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.2_q1.0']
+        ]
+recomp = [
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.5_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.5_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.5_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.5_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.5_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.5_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.5_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.5_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q0.5_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_cif_q0.5_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_cif_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q1.0_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_cif_q1.0_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q1.0_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_cif_q1.0_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q1.0_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_cif_q1.0_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q1.0_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_cif_q1.0_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_cif_q1.0_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_cif_q1.0_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.05_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.05_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.05_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.05_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.05_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.05_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.05_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.05_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.05_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.05_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.1_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.1_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.1_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.1_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.1_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.1_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.1_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.1_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.1_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.1_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.2_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.2_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.2_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.2_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.2_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.2_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.2_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.2_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.2_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.2_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.5_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.5_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.5_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.5_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.5_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.5_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.5_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.5_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q0.5_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q0.5_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q1.0_q0.05.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q1.0_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q1.0_q0.1.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q1.0_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q1.0_q0.2.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q1.0_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q1.0_q0.5.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q1.0_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'news_qcif_q1.0_q1.0.yuv', '/Users/pam/Documents/results/Comp/news_qcif_q1.0_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.05.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.05_q0.05.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.05_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.05_q0.1.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.05_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.05_q0.2.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.05_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.05_q0.5.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.05_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.05_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.05_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.1.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.1_q0.05.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.1_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.1_q0.1.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.1_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.1_q0.2.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.1_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.1_q0.5.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.1_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.1_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.1_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.2.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.2_q0.05.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.2_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.2_q0.1.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.2_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.2_q0.2.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.2_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.2_q0.5.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.2_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.2_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.2_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.5.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.5_q0.05.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.5_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.5_q0.1.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.5_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.5_q0.2.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.5_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.5_q0.5.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.5_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q0.5_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q0.5_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0_q0.05.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0_q0.05'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0_q0.1.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0_q0.1'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0_q0.2.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0_q0.2'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0_q0.5.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0_q0.5'],
+          ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0_q1.0']
+          ]
+
 def main(argv=None):  # pylint: disable=unused-argument
 
     #davino = getAverageQPinCSVs("/Users/pam/Documents/results/Davino/")
@@ -965,15 +1366,21 @@ def main(argv=None):  # pylint: disable=unused-argument
     #print("Average for davino {}, realisticTampering {}, SULFA {}".format(davino, rt, sulfa))
     #quit()
 
+    resultsLog = open("resultsLog.txt", "w")
+    resultsLog.write("file; tp; tn; fp; fn; mcc; f1; iouResult; frames")
+
     runAbunch = False
+    yuvfileslist = yuvfileslist_VTD + yuvfileslist_video + yuvfileslist_VTD2
+    recomp = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp_supp", "/Users/pam/Documents/results/Comp")
     if runAbunch:
-        for entry in yuvfileslist_VTD:
+        #for entry in yuvfileslist:
+        for entry in recomp:
             FLAGS.data_dir = entry[0]
             FLAGS.yuvfile = entry[1]
             FLAGS.heatmap = entry[2]
-            doEverything()
+            doEverything(resultsLog)
     else:
-        doEverything()
+        doEverything(resultsLog)
 
 if __name__ == '__main__':
     tf.app.run()

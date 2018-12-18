@@ -2665,7 +2665,7 @@ def inference_28(images, dropOut_prob = 1.0):
     Logits.
   """
   # PAJ: this is from the paper A deep learning approach to detection of splicing and copy-move forgeries in images
-  # By Nao and Ri at WIFS who used CASIA 2 and claim
+  # By Rao and Ni at WIFS who used CASIA 2 and claim
   # 97 percent but they've randomised their dataset
   # (so train and test are not disjoint)
 
