@@ -304,10 +304,15 @@ def frameDiffs(infilename, graphname, width, height, cropDim, cropTempStep, crop
     frames = range(0,num_frames)
 
     plt.plot(frames, avgs)
-    plt.title("Mean Frame Delta")
-    plt.xlabel("Frame number")
-    plt.ylabel("Average delta")
-    plt.savefig(graphname)
+    #plt.title("Mean Frame Delta")
+    #plt.xlabel("Frame number")
+    #plt.ylabel("Average delta")
+    plt.tick_params(
+        axis='y',  # changes apply to the x-axis
+        which='both',  # both major and minor ticks are affected
+        left=False,  # ticks along the left edge are off
+        labelleft=False)  # labels along the bottom edge are off
+    plt.savefig(graphname, bbox_inches='tight')
     plt.close()
 
     avgs = avgs.flatten()
@@ -426,7 +431,7 @@ def getVTDselectedframes(filename):
 
 
 
-def doEverything(resultsLog):
+def doEverything(resultsLog, threshold=1):
     doFrameDiffs = False
     doSelectedFramesOnly = False
     doPatching = False
@@ -440,15 +445,15 @@ def doEverything(resultsLog):
     doHeatmaps = False
     multiTruncatedOutput = False
 
-    #doFrameDiffs = True
+    doFrameDiffs = True
     #doSelectedFramesOnly = True
     #doPatching = True
     #doEvaluation = True
     #doClustering = True
-    #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
+    doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
     #doYUVSummary = True
     #doGroundTruthProcessing = True
-    doAverages = True
+    #doAverages = True
     #doIOU = True
     #doHeatmaps = True
     #multiTruncatedOutput = True
@@ -513,7 +518,7 @@ def doEverything(resultsLog):
     if doFrameDiffs:
         print("Doing frame diffs")
         # This is just a way of finding potential key frames
-        graphName = os.path.join(myHeatmapFileDir, "a_frameDiffs")
+        graphName = os.path.join(myHeatmapFileDir, "fig_frameDiffs")
         selectedFrames = frameDiffs(inFilename, graphName, width, height, cropDim, cropTempStep, cropSpacStep, diffsCSV)
         selectedFrames = selectedFrames[0].tolist()
         print("End of frame diffs")
@@ -594,7 +599,7 @@ def doEverything(resultsLog):
     if doClustering:
         print("Begin combination of preds")
         print("Predswidth {} predsheigh {} numPatches {}".format(predsWidth, predsHeight, numPatches))
-        kmeansClustering = True
+        kmeansClustering, thresholding = False, True
         perFrame = False
         if kmeansClustering:
             print("Clustering is kmeans")
@@ -637,6 +642,40 @@ def doEverything(resultsLog):
                 model.fit(allPreds)
                 # Prediction on the entire data
                 all_predictions = model.predict(allPreds)
+
+            # now all_predictions is either 0 or 1. Assume that "tampered"(1) is the minority class
+            t = all_predictions.sum()
+            print("Sum {} vs length {}".format(t, all_predictions.shape[0]))
+            #if t > all_predictions.shape[0]:
+            #    all_predictions = np.add(all_predictions, -1)
+
+            np.savetxt(clustersCSV, all_predictions, delimiter=",", fmt='%1.0f')
+            #print(all_predictions)
+        elif thresholding:
+            #threshold = 1
+            print("Clustering is thresholding, threshold is qp={}".format(threshold))
+            allPreds = []
+            clusteredNetworks = [qpNetwork, frameDiffNetwork]
+
+            clusteredNetworks = [qpNetwork]
+            #clusteredNetworks = [frameDiffNetwork]
+            for network in clusteredNetworks:
+                predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
+                predVals = np.loadtxt(predFilename)
+                predVals = predVals[0:numPatches]
+                #normPredVals = predVals / np.linalg.norm(predVals)
+                allPreds = predVals
+
+            allPreds = np.asarray(allPreds)
+            allPreds = allPreds.flatten()
+            print(len(clusteredNetworks))
+
+            allPreds = allPreds.reshape(len(clusteredNetworks), numPatches)
+            allPreds = np.swapaxes(allPreds, 0, 1)
+            #print(allPreds[0:20, :])
+            all_predictions = np.zeros(allPreds.shape)
+
+            all_predictions[np.where(allPreds < threshold)] = 1
 
             # now all_predictions is either 0 or 1. Assume that "tampered"(1) is the minority class
             t = all_predictions.sum()
@@ -706,16 +745,16 @@ def doEverything(resultsLog):
             #print("Here's the diffs for {}".format(network['summary']))
             #print(avgs)
             plt.plot(frames, avgs)
-            plt.title("Frame average for predicted {}".format(network['summary']))
-            plt.xlabel("Frame number")
-            plt.ylabel("Average value of {}".format(network['summary']))
+            #plt.title("Frame average for predicted {}".format(network['summary']))
+            #plt.xlabel("Frame number")
+            #plt.ylabel("Average value of {}".format(network['summary']))
             plt.tick_params(
                 axis='y',  # changes apply to the x-axis
                 which='both',  # both major and minor ticks are affected
                 left=False,  # ticks along the left edge are off
                 labelleft=False)  # labels along the bottom edge are off
-            filename = os.path.join(myHeatmapFileDir, "a_{}".format(network['summary']))
-            plt.savefig(filename)
+            filename = os.path.join(myHeatmapFileDir, "fig_{}".format(network['summary']))
+            plt.savefig(filename, bbox_inches='tight')
             plt.close()
 
 
@@ -725,16 +764,16 @@ def doEverything(resultsLog):
                 faTotals = np.multiply(avgs, faTotals)
 
         plt.plot(frames, faTotals)
-        plt.title("Frame totals for all")
-        plt.xlabel("Frame number")
-        plt.ylabel("Average value from all")
+        #plt.title("Frame totals for all")
+        #plt.xlabel("Frame number")
+        #plt.ylabel("Average value from all")
         plt.tick_params(
             axis='y',  # changes apply to the x-axis
             which='both',  # both major and minor ticks are affected
             left=False,  # ticks along the left edge are off
             labelleft=False)  # labels along the bottom edge are off
-        filename = os.path.join(myHeatmapFileDir, "a_all")
-        plt.savefig(filename)
+        filename = os.path.join(myHeatmapFileDir, "fig_all")
+        plt.savefig(filename, bbox_inches='tight')
         plt.close()
 
         model = KMeans(n_clusters=2)
@@ -847,40 +886,116 @@ def doEverything(resultsLog):
     if doAverages:
         print("Doing Averages")
         # First check that the mask is available:
-        if not os.path.isfile(gtCSV):
-            print("The ground truth file {} does not exist".format(gtCSV))
 
         filesToCheck = [qpNetwork['predFilename'], diffsCSV]
         predsPerFrame = predsWidth * predsHeight
         totalPreds = predsPerFrame * keyFrames.shape[0]
 
-        gtVals = np.loadtxt(gtCSV)
-        gtVals = gtVals[0:totalPreds]
+        if not os.path.isfile(gtCSV):
+            print("The ground truth file {} does not exist".format(gtCSV))
+            gtVals = np.zeros(totalPreds)
+            gtVals[0:predsPerFrame] = 1
+        else:
+            gtVals = np.loadtxt(gtCSV)
+            gtVals = gtVals[0:totalPreds]
 
         for file in filesToCheck:
+            f = os.path.basename(file)
+            f,b = os.path.splitext(f)
             predFilename = os.path.join(myHeatmapFileDir, file)
             predVals = np.loadtxt(predFilename)
             predVals = predVals[0:totalPreds]
 
             a_all = np.average(predVals)
-            print("Overall average for {} is {}".format(file, a_all))
+            v_all = np.var(predVals)
             a_mask0 = np.average(predVals[np.where(gtVals == 0)])
-            print("Length = {}".format(len(a_mask0)))
-            print(a_mask0)
+            v_mask0 = np.var(predVals[np.where(gtVals == 0)])
             a_mask1 = np.average(predVals[np.where(gtVals == 1)])
-            print("Length = {}".format(len(a_mask1)))
-            print(a_mask1)
-            if not doFrameAnalysis or (keyFrames.shape[0] == interestingFrames.shape[0]):
-                print("WARNING:!!!! Your results will be awful as you're not isolating key frames....!!!!!")
+            v_mask1 = np.var(predVals[np.where(gtVals == 1)])
+            print("Averages: File {} and {}  Overall average: {} {} nomask: {} {} mask: {} {}".format(myHeatmapFileDir, f, a_all, v_all, a_mask0, v_mask0, a_mask1, v_mask1))
 
-            n0, bins0, patches0 = plt.hist(a_mask0, 50, facecolor='blue')
-            n1, bins1, patches1 = plt.hist(a_mask1, 50, facecolor='yellow')
+            if file == qpNetwork['predFilename']:
+                bins = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+                xLabel = "Predicted Quantisation Parameter"
+                xTicks = range(0, 52, 7)
+                xTickPosn = [bin+0.5 for bin in bins]
+            else:
+                bins = [0,1,2]
+                xLabel = "Macroblock comparison in consecutive frames"
+                xTicks = ["same", "different", ""]
+                xTickPosn = [bin+0.5 for bin in bins]
+
+            mask0 = predVals[np.where(gtVals == 0)]
+            mask1 = predVals[np.where(gtVals == 1)]
+
+            mask0_w = np.empty(mask0.shape)
+            mask0_w.fill(1 / mask0.shape[0])
+            mask1_w = np.empty(mask1.shape)
+            mask1_w.fill(1 / mask1.shape[0])
+
+            n0, bins0, patches0 = plt.hist([mask0, mask1],
+                                           bins=bins,
+                                           color=['#fffb00', '#000000'],
+                                           weights=[mask0_w, mask1_w],
+                                           label=['authentic', 'masked'],
+                                           rwidth=1.0)
+            #n1, bins1, patches1 = plt.hist(predVals[np.where(gtVals == 1)], bins=bins, facecolor='yellow', alpha = 0.5, normed=1)
+            plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
             plt.title("Mask Histogram")
-            plt.xlabel("Predicted QP")
+            plt.xlabel(xLabel)
             plt.ylabel("Frequency")
-            filename = os.path.join(myHeatmapFileDir, "a_mask_hist")
+            plt.legend()
+            filename = os.path.join(myHeatmapFileDir, "a_mask_hist_{}".format(f))
             plt.savefig(filename)
             plt.close()
+
+            # And "key frames only"
+            if interestingFrames.shape[0] != keyFrames.shape[0]:
+                #print("Plus doing the average on just the key frames")
+                predVals2 = predVals.reshape((keyFrames.shape[0], predsPerFrame))
+                gtVals2 = gtVals.reshape((keyFrames.shape[0], predsPerFrame))
+                predVals2 = predVals2[interestingFrames, :]
+                gtVals2 = gtVals2[interestingFrames, :]
+
+                a_all = np.average(predVals2)
+                v_all = np.var(predVals2)
+                a_mask0 = np.average(predVals2[np.where(gtVals2 == 0)])
+                v_mask0 = np.var(predVals2[np.where(gtVals2 == 0)])
+                a_mask1 = np.average(predVals2[np.where(gtVals2 == 1)])
+                v_mask0 = np.var(predVals2[np.where(gtVals2 == 1)])
+                print("Averages: File {} and {}  key average: {} {} nomask: {} {} mask: {} {}".format(myHeatmapFileDir, f, a_all, v_all, a_mask0, v_mask0, a_mask1, v_mask1))
+
+                mask0 = predVals2[np.where(gtVals2 == 0)]
+                mask1 = predVals2[np.where(gtVals2 == 1)]
+
+                if mask1.shape[0] == 0 or mask0.shape[0] == 0:
+                    print("no duality in detected key frames")
+                    continue
+
+                mask0_w = np.empty(mask0.shape)
+                mask0_w.fill(1 / mask0.shape[0])
+                mask1_w = np.empty(mask1.shape)
+                mask1_w.fill(1 / mask1.shape[0])
+
+                #n0, bins0, patches0 = plt.hist(predVals2[np.where(gtVals2 == 0)], bins=bins, facecolor='blue', alpha = 0.5, normed=1)
+                n0, bins0, patches0 = plt.hist([mask0, mask1],
+                                               bins=bins,
+                                               color=['#fffb00', '#000000'],
+                                               weights=[mask0_w, mask1_w],
+                                               label=['authentic', 'masked'],
+                                               rwidth=1.0)
+                #n1, bins1, patches1 = plt.hist(predVals2[np.where(gtVals2 == 1)], bins=bins, facecolor='yellow', alpha = 0.5, normed=1)
+                plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
+                plt.title("Mask Histogram")
+                plt.xlabel(xLabel)
+                plt.ylabel("Frequency")
+                plt.legend()
+                filename = os.path.join(myHeatmapFileDir, "a_mask_key_hist_{}".format(f))
+                plt.savefig(filename)
+                plt.close()
+            else:
+                print("Not doing key frames")
+
 
         print("Finished doing averages")
 
@@ -978,6 +1093,9 @@ def doEverything(resultsLog):
                                                  f1,
                                                  inFilename,
                                                  interestingFrames))
+        tpr = tp / (tp+fn)
+        fpr = fp / (fp+tn)
+        print("tpr:{}, fpr:{}".format(tpr, fpr))
         resultsLog.write("{}; {}; {}; {}; {}; {}; {}; {}; {}\n".format(inFilename, tp, tn, fp, fn, mcc, f1, iouResult, interestingFrames))
 
 
@@ -1131,6 +1249,19 @@ yuvfileslist_video =[
     ["/Users/pam/Documents/data/SULFA_yuv/", "10_f.yuv", "/Users/pam/Documents/results/SULFA/10"],
 ]
 
+yuvfileslist_davino =[
+    ["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_f.yuv", "/Users/pam/Documents/results/Davino/tank"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_f.yuv", "/Users/pam/Documents/results/Davino/man"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_f.yuv", "/Users/pam/Documents/results/Davino/helicopter"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_f.yuv", "/Users/pam/Documents/results/Davino/hen"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "06_LION_f.yuv", "/Users/pam/Documents/results/Davino/lion"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_f.yuv", "/Users/pam/Documents/results/Davino/ufo"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "09_GIRL_f.yuv", "/Users/pam/Documents/results/Davino/girl"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "10_DOG_f.yuv", "/Users/pam/Documents/results/Davino/dog"],
+]
+
 
 yuvfileslist_realisticImages =[
     ["/Users/pam/Documents/data/realisticTampering/", "all_1080p_0.yuv", "/Users/pam/Documents/results/realisticTampering/0"],
@@ -1187,7 +1318,9 @@ yuvfileslist_theTestSet = [
     ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_0", "tempete_cif_q0.yuv", "/Users/pam/Documents/results/testSet/tempete_q0"],
 ]
 justOne = [
-    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
+    ["/Users/pam/Documents/data/VTD_yuv", "basketball_f.yuv", "/Users/pam/Documents/results/VTD/basketball"],
+    ["/Users/pam/Documents/data/VTD_yuv", "cctv_f.yuv", "/Users/pam/Documents/results/VTD/cctv"],
+
 ]
 
 def createFileList(srcDir="/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", resultsDir="/Users/pam/Documents/results/Comp"):
@@ -1369,16 +1502,20 @@ def main(argv=None):  # pylint: disable=unused-argument
     resultsLog = open("resultsLog.txt", "w")
     resultsLog.write("file; tp; tn; fp; fn; mcc; f1; iouResult; frames")
 
-    runAbunch = False
+    runAbunch = True
     yuvfileslist = yuvfileslist_VTD + yuvfileslist_video + yuvfileslist_VTD2
-    recomp = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp_supp", "/Users/pam/Documents/results/Comp")
+    recomp0 = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", "/Users/pam/Documents/results/Comp")
+    recomp1 = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp_supp", "/Users/pam/Documents/results/Comp")
+    recomp2 = createFileList("/Volumes/LaCie/data/yuv_testOnly/1stComp", "/Users/pam/Documents/results/Comp")
+    recomp = recomp0 + recomp1 + recomp2
     if runAbunch:
         #for entry in yuvfileslist:
-        for entry in recomp:
+        for entry in justOne:
             FLAGS.data_dir = entry[0]
             FLAGS.yuvfile = entry[1]
             FLAGS.heatmap = entry[2]
-            doEverything(resultsLog)
+            #for threshold in range(0, 8, 1):
+            doEverything(resultsLog, threshold=0)
     else:
         doEverything(resultsLog)
 
