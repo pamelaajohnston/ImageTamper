@@ -60,10 +60,12 @@ NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 836512 # IP and Deblocking dataset figures
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 12992
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 669636 # QP0-14 and 0-21 (not inclusive)
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 49343
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 17 # QP0-14 and 0-21 (not inclusive)
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 11
 
 
 # Number of classes
-NUM_CLASSES = 7
+NUM_CLASSES = 8
 #NUM_CLASSES = 2
 # This is the number of training examples in the dataset - one epoch runs over all the examples
 
@@ -177,7 +179,7 @@ def _generate_image_and_label_batch(image, label, min_queue_examples, batch_size
   return images, tf.reshape(label_batch, [batch_size])
 
 
-def distorted_inputs(data_dir, batch_size, distort=2):
+def distorted_inputs(data_dir, batch_size, distort=2, num_examples_per_epoch_for_train=NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN):
   """Construct distorted input for training using the Reader ops.
 
   Args:
@@ -247,7 +249,7 @@ def distorted_inputs(data_dir, batch_size, distort=2):
 
   # Ensure that the random shuffling has good mixing properties.
   min_fraction_of_examples_in_queue = 0.4
-  min_queue_examples = int(NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN * min_fraction_of_examples_in_queue)
+  min_queue_examples = int(num_examples_per_epoch_for_train * min_fraction_of_examples_in_queue)
   print ('Filling queue with %d images before starting to train. ' 'This will take a few minutes.' % min_queue_examples)
 
   # Generate a batch of images and labels by building up a queue of examples.
@@ -276,13 +278,15 @@ def inputs(eval_data, data_dir, batch_size, singleThreaded=False, filename="", n
       filenames = [os.path.join(data_dir, 'train_crop.bin')]
       # For CASIA2 256x256 patches and 128x128 patches
       filenames = [os.path.join(data_dir, 'train_crop_%d.bin' % i) for i in xrange(0, 11)]
-      filenames = [os.path.join(data_dir, 'train_%d.bin' % i) for i in xrange(0, 10)]
       num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+      filenames = [os.path.join(data_dir, 'train_%d.bin' % i) for i in xrange(0, 10)]
+      num_examples_per_epoch = numExamplesToTest
     else:
       num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
       filenames = [os.path.join(data_dir, 'patches_test_%d.bin' % i) for i in xrange(0, 1)]
       filenames = [os.path.join(data_dir, 'test_crop.bin')]
       #filenames = [os.path.join(data_dir, 'test_crop_%d.bin' % i) for i in xrange(0, 10)]
+      num_examples_per_epoch = numExamplesToTest
       filenames = [os.path.join(data_dir, 'test_%d.bin' % i) for i in xrange(0, 10)]
       print("Inputting test data which is {}".format(filenames))
   else:

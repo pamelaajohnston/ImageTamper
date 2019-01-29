@@ -82,7 +82,13 @@ if __name__ == "__main__":
     entries = [
         ["/Users/pam/Documents/results/Davino/hen/clusters.yuv", "fig_hen_clusters.png", 0, 1280, 720],
     ]
-    invert=True
+    #invert=True
+    entries = [
+        ["/Users/pam/Documents/data/Davino_yuv/08_TREE_r.yuv", "fig_tree_r.png", 10, 1280, 720],
+        ["/Users/pam/Documents/data/Davino_yuv/08_TREE_f.yuv", "fig_tree_f.png", 10, 1280, 720],
+        ["/Users/pam/Documents/data/Davino_yuv/08_TREE_mask.yuv", "fig_tree_mask.png", 10, 1280, 720],
+    ]
+    invert=False
 
     for entry in entries:
         infilename = entry[0]

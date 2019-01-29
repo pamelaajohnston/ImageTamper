@@ -92,12 +92,13 @@ def makeNormalisedPatches(frame, pic_w, pic_h, crop_w, crop_h, crop_step, channe
             xend = x + crop_w
             patch = mybytes[:, y:yend, x:xend]
             patch = patch.flatten()
+            patch = np.divide(patch, bit_depth)
             if addLabel:
-                patch = np.insert(patch, 0, (label*bit_depth))
+                patch = np.insert(patch, 0, (label))
             patchesList.append(patch)
 
     patches_array = np.array(patchesList)
-    patches_array = np.divide(patches_array, bit_depth)
+    #patches_array = np.divide(patches_array, bit_depth)
     #print(patches_array.shape)
     return patches_array
 
@@ -255,6 +256,12 @@ def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSp
         label = int(qp / 2)
         label = int(qp / 3)
         print(label)
+    if label == "qp_only":
+        qp = getQuantFromFileName(fileIn)
+        print("Got qp {} from {}".format(qp, fileIn))
+        if qp < 0:
+            qp = 0
+        label = int(qp)
     if label == "none":
         label = 0
 
@@ -316,6 +323,88 @@ def patchOneFile(fileIn, fileOut, label="qp", cropDim=80, cropTempStep=1, cropSp
     return numPatches
 
 
+# Defaults are for overlapping patches for heatmap generation
+def patchABitOfOneFile(fileIn, fileOut, start=0, end=0, label="qp", cropDim=80, cropTempStep=1, cropSpacStep=16, num_channels=3, bit_depth=8):
+    width, height = getDimsFromFileName(fileIn)
+    patchList = []
+    #print("Width is {}, height is {}".format(width, height))
+    if label == "qp":
+        qp = getQuantFromFileName(fileIn)
+        if qp < 0:
+            qp = 0
+        label = int(qp / 7)
+        label = qp
+        label = int(qp / 2)
+        label = int(qp / 3)
+        print(label)
+    if label == "qp_only":
+        qp = getQuantFromFileName(fileIn)
+        print("Got qp {} from {}".format(qp, fileIn))
+        if qp < 0:
+            qp = 0
+        label = int(qp)
+    if label == "none":
+        label = 0
+
+
+    frameSize = width * height * 3 // 2
+    print("The file is {} with width {}, height {}, label {}".format(fileIn, width, height, label))
+
+    with open(fileIn, "rb") as f:
+        mybytes = np.fromfile(f, 'u1')
+    print("There are {} bytes in the file width: {} height: {}".format(len(mybytes), width, height))
+    num_frames = len(mybytes) / frameSize
+    print("There are {} frames".format(num_frames))
+
+    if end == 0:
+        end = num_frames
+
+
+    for f in range(start, end, cropTempStep):
+        #print("Frame number {}".format(f))
+        start = f*frameSize
+        end = start + frameSize
+        myframe = mybytes[start:end]
+        my444frame = functions.YUV420_2_YUV444(myframe, height, width)
+
+        patches = makeNormalisedPatches(my444frame, width, height, cropDim, cropDim, cropSpacStep, num_channels, bit_depth, label)
+        patchList.extend(patches)
+
+    patches_array = np.array(patchList)
+
+    patches_array = patches_array.flatten()
+    patchSize = (cropDim * cropDim * 3) + 1
+    numPatches = patches_array.shape[0]/patchSize
+    print("Dims: {}, numPatches {}".format(patches_array.shape, numPatches))
+    patches_array = patches_array.reshape((numPatches, patchSize))
+
+
+    ############## Here's where you name the files!!!!###########
+
+    multipleOutFiles = False
+    if multipleOutFiles:
+        numBinFiles = 10
+        patchesPerFile = numPatches // numBinFiles
+        if numPatches < 100:
+            patchesPerFile = 1
+
+        for i in range(0, (numBinFiles-1)):
+            outFileName = "{}_{}.bin".format(fileOut, i)
+            start = patchesPerFile * i
+            end = start+patchesPerFile
+            arrayCut = patches_array[start:end, :]
+            outFileName = os.path.join(cropDir, outFileName)
+            functions.appendToFile(arrayCut, outFileName)
+
+        # the last file is a bit bigger
+        outFileName = "{}_{}.bin".format(binFileName, numBinFiles)
+        start = patchesPerFile * (numBinFiles-1)
+        arrayCut = patches_array[start:, :]
+        outFileName = os.path.join(cropDir, outFileName)
+        functions.appendToFile(arrayCut, outFileName)
+    else:
+        functions.appendToFile(patches_array, fileOut)
+    return numPatches
 
 
 

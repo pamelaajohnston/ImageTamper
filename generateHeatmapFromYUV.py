@@ -445,17 +445,17 @@ def doEverything(resultsLog, threshold=1):
     doHeatmaps = False
     multiTruncatedOutput = False
 
-    doFrameDiffs = True
-    #doSelectedFramesOnly = True
-    #doPatching = True
-    #doEvaluation = True
-    #doClustering = True
-    doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
-    #doYUVSummary = True
-    #doGroundTruthProcessing = True
-    #doAverages = True
-    #doIOU = True
-    #doHeatmaps = True
+    #doFrameDiffs = True
+    #doSelectedFramesOnly = True # selects some frame from one of the tables
+    #doPatching = True # Patches up the YUV file
+    #doEvaluation = True # Evaluates the patches using whatever networks are programmed (takes ages but saves results to file)
+    doClustering = True # Clusters the results somehow - sub options are available
+    #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
+    #doYUVSummary = True #extracts only the key frames to a summary file
+    #doGroundTruthProcessing = True # takes the ground truth and turns it into a csv (16x16 granularity)
+    #doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
+    #doIOU = True # Actually compares clusters to gt using IOU, F1, MCC, TPR, FPR among other things
+    doHeatmaps = True
     #multiTruncatedOutput = True
 
     numPatches = 0
@@ -599,7 +599,7 @@ def doEverything(resultsLog, threshold=1):
     if doClustering:
         print("Begin combination of preds")
         print("Predswidth {} predsheigh {} numPatches {}".format(predsWidth, predsHeight, numPatches))
-        kmeansClustering, thresholding = False, True
+        kmeansClustering, advancedKmeans, thresholding = False, True, False
         perFrame = False
         if kmeansClustering:
             print("Clustering is kmeans")
@@ -621,6 +621,92 @@ def doEverything(resultsLog, threshold=1):
             allPreds = allPreds.reshape(len(clusteredNetworks), numPatches)
             allPreds = np.swapaxes(allPreds, 0, 1)
             #print(allPreds)
+            if perFrame:
+                allPreds = allPreds.reshape((numFrames, (predsHeight*predsWidth),  len(clusteredNetworks)))
+                #all_predictions = []
+                for f in range(0,numFrames):
+                    myPreds = allPreds[f, :, :]
+                    model = KMeans(n_clusters=2)
+                    # Fitting Model
+                    model.fit(myPreds)
+                    # Prediction on the entire data
+                    if f==0:
+                        all_predictions = model.predict(myPreds)
+                    else:
+                        all_predictions = np.append(all_predictions, model.predict(myPreds))
+
+
+            else:
+                model = KMeans(n_clusters=2)
+                # Fitting Model
+                model.fit(allPreds)
+                # Prediction on the entire data
+                all_predictions = model.predict(allPreds)
+
+            # now all_predictions is either 0 or 1. Assume that "tampered"(1) is the minority class
+            t = all_predictions.sum()
+            print("Sum {} vs length {}".format(t, all_predictions.shape[0]))
+            #if t > all_predictions.shape[0]:
+            #    all_predictions = np.add(all_predictions, -1)
+
+            np.savetxt(clustersCSV, all_predictions, delimiter=",", fmt='%1.0f')
+            #print(all_predictions)
+        elif advancedKmeans:
+            print("Clustering is advanced kmeans (i.e. using the 8? neighbours as a feature)")
+            allPreds = []
+            clusteredNetworks = [qpNetwork, deblockNetwork]
+            clusteredNetworks = [qpNetwork, frameDiffNetwork]
+            #clusteredNetworks = [qpNetwork]
+            #clusteredNetworks = [frameDiffNetwork]
+            for network in clusteredNetworks:
+                predFilename = os.path.join(myHeatmapFileDir, network['predFilename'])
+                predVals = np.loadtxt(predFilename)
+                predVals = predVals[0:numPatches]
+                normPredVals = predVals / np.linalg.norm(predVals)
+                allPreds.extend(normPredVals)
+
+                normPredVals = normPredVals.reshape((numFrames, predsHeight, predsWidth))
+
+                #print(normPredVals[0, 0:5, 0:5])
+
+                firstCol = normPredVals[:, :, 0].reshape((numFrames, predsHeight, 1))
+                lastCol = normPredVals[:, :, (predsWidth-1)].reshape((numFrames, predsHeight, 1))
+                firstRow = normPredVals[:, 0, :].reshape((numFrames, 1, predsWidth))
+                lastRow = normPredVals[:, (predsHeight-1), :].reshape((numFrames, 1, predsWidth))
+
+                normPredVals_left = np.append(firstCol, normPredVals[:, :, :(predsWidth-1)], axis=2)
+                #print("left")
+                #print(normPredVals_left[0, 0:5, 0:5])
+
+                normPredVals_right = np.append(normPredVals[:, :, 1:], lastCol, axis=2)
+                #print("right")
+                #print(normPredVals_right[0, 0:5, 0:5])
+
+                normPredVals_top = np.append(firstRow, normPredVals[:, :(predsHeight-1), :], axis=1)
+                #print("top")
+                #print(normPredVals_top[0, 0:5, 0:5])
+
+                normPredVals_bottom = np.append(normPredVals[:, 1:, :], lastRow, axis=1)
+                #print("bottom")
+                #print(normPredVals_bottom[0, 0:5, 0:5])
+                print(normPredVals_left.shape)
+                print(normPredVals_right.shape)
+                print(normPredVals_top.shape)
+                print(normPredVals_bottom.shape)
+
+                allPreds.extend(normPredVals_left.flatten())
+                allPreds.extend(normPredVals_right.flatten())
+                allPreds.extend(normPredVals_top.flatten())
+                allPreds.extend(normPredVals_bottom.flatten())
+
+
+            allPreds = np.asarray(allPreds)
+            allPreds = allPreds.flatten()
+            print(len(clusteredNetworks))
+            featuresPerPatch = len(clusteredNetworks) * 5
+            allPreds = allPreds.reshape(featuresPerPatch, numPatches)
+            allPreds = np.swapaxes(allPreds, 0, 1)
+            print(allPreds.shape)
             if perFrame:
                 allPreds = allPreds.reshape((numFrames, (predsHeight*predsWidth),  len(clusteredNetworks)))
                 #all_predictions = []
@@ -1115,6 +1201,7 @@ def doEverything(resultsLog, threshold=1):
     if doHeatmaps:
         heatmapNetworks = [qpNetwork, ipNetwork, deblockNetwork]
         print("Begin generating heatmaps")
+        # 0 is all the networks, 1 is the clusters, 2 is the diffs, 3 is the ground truth
         #for generateAll in [0, 1, 2, 3]:
         for generateAll in [0, 1, 2]:
             for network in heatmapNetworks:
@@ -1322,6 +1409,9 @@ justOne = [
     ["/Users/pam/Documents/data/VTD_yuv", "cctv_f.yuv", "/Users/pam/Documents/results/VTD/cctv"],
 
 ]
+justOne = [
+    ["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree"]
+]
 
 def createFileList(srcDir="/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", resultsDir="/Users/pam/Documents/results/Comp"):
     fileList = []
@@ -1502,7 +1592,8 @@ def main(argv=None):  # pylint: disable=unused-argument
     resultsLog = open("resultsLog.txt", "w")
     resultsLog.write("file; tp; tn; fp; fn; mcc; f1; iouResult; frames")
 
-    runAbunch = True
+    runAbunch = False
+    #runAbunch = True
     yuvfileslist = yuvfileslist_VTD + yuvfileslist_video + yuvfileslist_VTD2
     recomp0 = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", "/Users/pam/Documents/results/Comp")
     recomp1 = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp_supp", "/Users/pam/Documents/results/Comp")
@@ -1517,7 +1608,7 @@ def main(argv=None):  # pylint: disable=unused-argument
             #for threshold in range(0, 8, 1):
             doEverything(resultsLog, threshold=0)
     else:
-        doEverything(resultsLog)
+        doEverything(resultsLog, threshold=0)
 
 if __name__ == '__main__':
     tf.app.run()

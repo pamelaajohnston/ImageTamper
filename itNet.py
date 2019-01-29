@@ -44,6 +44,7 @@ tf.app.flags.DEFINE_string('batches_dir', ' ', """Path to the secondary data dir
 tf.app.flags.DEFINE_boolean('use_fp16', False, """Train the model using fp16.""")
 tf.app.flags.DEFINE_integer('binarise_label', 0, """Binarise this label""")
 tf.app.flags.DEFINE_integer('training', 1, """Training cycle""")
+tf.app.flags.DEFINE_integer('num_training_examples', itNet_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN, """Training cycle""")
 
 #tf.app.flags.DEFINE_string('prelearned_checkpoint', '/Users/pam/Documents/data/CIFAR-10/test3/cifar10_train/train_yuv/model.ckpt-29999', """The same network architecture trained on something else""")
 
@@ -231,7 +232,7 @@ def distorted_inputs():
 
   print("The data dir is {} in distorted_inputs".format(data_dir))
   #images, labels = itNet_input.distorted_inputs(data_dir=data_dir, batch_size=FLAGS.batch_size, distort=False)
-  images, labels = itNet_input.distorted_inputs(data_dir=data_dir, batch_size=FLAGS.batch_size, distort=1)
+  images, labels = itNet_input.distorted_inputs(data_dir=data_dir, batch_size=FLAGS.batch_size, distort=1, num_examples_per_epoch_for_train=FLAGS.num_training_examples)
 
   if FLAGS.use_fp16:
     images = tf.cast(images, tf.float16)
