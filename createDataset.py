@@ -2,7 +2,14 @@ import numpy as np
 import sys
 import os
 import shutil
-import functions
+
+def saveToFile(data, filename):
+    datayuv = np.asarray(data, 'u1')
+    yuvByteArray = bytearray(datayuv)
+    mylen = len(yuvByteArray)
+    yuvFile = open(filename, "wb")
+    yuvFile.write(yuvByteArray)
+    yuvFile.close()
 
 def createFileList(srcDir="/Volumes/LaCie/data/YUV_temp", desiredNames=["tempete_cif"]):
     fileList = []
@@ -97,7 +104,7 @@ def createDataset(indexNumer, pathToSource, pathToDst):
         end = start + patchesPerFile
         data = patches[start:end,:]
         data = data.flatten()
-        functions.saveToFile(data, file)
+        saveToFile(data, file)
 
     numTestPatches = numPatches
 
@@ -164,7 +171,7 @@ def createDataset(indexNumer, pathToSource, pathToDst):
         end = start + patchesPerFile
         data = patches[start:end,:]
         data = data.flatten()
-        functions.saveToFile(data, file)
+        saveToFile(data, file)
 
 
 
@@ -212,7 +219,7 @@ def createDataset(indexNumer, pathToSource, pathToDst):
         end = start + patchesPerFile
         data = patches[start:end,:]
         data = data.flatten()
-        functions.saveToFile(data, file)
+        saveToFile(data, file)
     return numTestPatches, numTrainPatches
 
 if __name__ == "__main__":
