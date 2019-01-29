@@ -99,6 +99,8 @@ def createDataset(indexNumer, pathToSource, pathToDst):
         data = data.flatten()
         functions.saveToFile(data, file)
 
+    numTestPatches = numPatches
+
     data = []
     outfiles = []
     patches = []
@@ -140,6 +142,7 @@ def createDataset(indexNumer, pathToSource, pathToDst):
     print("And now the list is a numpy array")
     patchList = []
     numPatches = patches_array.shape[0]//entrySize
+    numTrainPatches = numPatches
     print("Total train patches: {}".format(numPatches))
     patches = patches_array.reshape((numPatches, entrySize))
 
@@ -187,6 +190,7 @@ def createDataset(indexNumer, pathToSource, pathToDst):
     patches_array = patches_array.flatten()
     entrySize = ((patchDim*patchDim*3)+1)
     numPatches = patches_array.shape[0]//entrySize
+    numTrainPatches = numTrainPatches + numPatches
     print("Total train patches: {}".format(numPatches))
     patches = patches_array.reshape((numPatches, entrySize))
 
@@ -209,6 +213,7 @@ def createDataset(indexNumer, pathToSource, pathToDst):
         data = patches[start:end,:]
         data = data.flatten()
         functions.saveToFile(data, file)
+    return numTestPatches, numTrainPatches
 
 if __name__ == "__main__":
 

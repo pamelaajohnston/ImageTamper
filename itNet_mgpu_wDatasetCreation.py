@@ -49,7 +49,7 @@ tf.app.flags.DEFINE_string('train_dir', '/Users/pam/Documents/temp/',
 tf.app.flags.DEFINE_integer('max_steps', 30000, """Number of batches to run.""")
 tf.app.flags.DEFINE_integer('num_gpus', 1, """How many GPUs to use.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,  """Whether to log device placement.""")
-tf.app.flags.DEFINE_string('mylog_dir', '/Users/pam/Documents/temp/',  """Directory where to write my logs """)
+tf.app.flags.DEFINE_string('mylog_dir', '.',  """Directory where to write my logs """)
 tf.app.flags.DEFINE_integer('optimizer', 0, """0 Adam Optimizer, 1 Gradient Descent Optimizer""")
 tf.app.flags.DEFINE_integer('datasetSplit', 0, """Dataset split to chose""")
 #tf.app.flags.DEFINE_integer('network_architecture', 1, """The number of the network architecture to use (inference function) """)
@@ -359,7 +359,12 @@ def main_justTheOne(argv=None):  # pylint: disable=unused-argument
 
     # First, create the dataset
     mungedDatasetDir = os.path.join(FLAGS.data_dir, "munged")
-    createDataset(FLAGS.datasetSplit, FLAGS.data_dir, mungedDatasetDir)
+    numTestPatches = 6496
+    numTrainPatches = 70560
+    numTestPatches, numTrainPatches = createDataset.createDataset(FLAGS.datasetSplit, FLAGS.data_dir, mungedDatasetDir)
+    FLAGS.num_training_examples = numTrainPatches
+    FLAGS.num_examples = numTestPatches
+    FLAGS.data_dir = mungedDatasetDir
 
     logfile = os.path.join(FLAGS.mylog_dir, "log_results.txt")
     log = open(logfile, 'w')
@@ -399,14 +404,14 @@ def main_justTheOne(argv=None):  # pylint: disable=unused-argument
     itNet.FLAGS.training = 0
     idx = 0
     precision, cm = itNet_eval.evaluate()
-    print("The confusion matrix (yay!): \n {}".format(cm))
-    #log.write("The confusion matrix (yay!): \n {}".format(cm))
+    print("The confusion matrix (yay!): \n {} \n".format(cm))
+    log.write("Precision {}. \nThe confusion matrix (yay!): \n {} \n".format(precision, cm))
     if idx == 0:
         confusionMatrix = cm
     else:
         confusionMatrix = confusionMatrix + cm
     log.flush()
-    print("The overall confusion matrix is: \n {}".format(confusionMatrix))
+    print("The overall confusion matrix is: \n {}\n".format(confusionMatrix))
     # confusion matrix totals:
     labelTots = np.sum(confusionMatrix, axis=1)
     print("Label totals: {} ".format(labelTots))
@@ -418,7 +423,8 @@ def main_justTheOne(argv=None):  # pylint: disable=unused-argument
     print("Diagonal is {}. Precision is : {} out of {} = {}".format(confusionMatrix.diagonal(), totalCorrects, totalTests, prec))
 
 
-    log.write("The overall confusion matrix is: \n {}".format(confusionMatrix))
+    log.write("The overall confusion matrix is: \n {} \n".format(confusionMatrix))
+    log.write("Diagonal is {}. \nPrecision is : {} out of {} = {}\n".format(confusionMatrix.diagonal(), totalCorrects, totalTests, prec))
     log.flush()
 
 
