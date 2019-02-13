@@ -27,6 +27,10 @@ from sklearn.naive_bayes import GaussianNB
 from imblearn.over_sampling import SMOTE
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import f1_score
+from sklearn.model_selection import StratifiedKFold
 
 
 def pickOutKeyFrames(filenames, predsWidth, predsHeight, numPatches, numFrames):
@@ -90,57 +94,28 @@ def predictNumPatches(fileSize, cropDim, tempStep, spacStep, height, width):
     numPatches = patchedFrames * patchWidth * patchHeight
     return patchWidth, patchHeight, patchedFrames, numPatches
 
-from keras import backend as K
-def sensitivity(y_true, y_pred):
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-    return true_positives / (possible_positives + K.epsilon())
-
-def specificity(y_true, y_pred):
-    true_negatives = K.sum(K.round(K.clip((1-y_true) * (1-y_pred), 0, 1)))
-    possible_negatives = K.sum(K.round(K.clip(1-y_true, 0, 1)))
-    return true_negatives / (possible_negatives + K.epsilon())
-
-if __name__ == "__main__":
-    dataPath = "/Users/pam/Documents/results/tree/"
-    yuvFile = "/Users/pam/Documents/data/Davino_yuv/08_TREE_f.yuv"
-    #dataPath = "/Users/pam/Documents/results/Davino/tank/"
-    #yuvFile = "/Users/pam/Documents/data/Davino_yuv/01_TANK_f.yuv"
-    #dataPath = "/Users/pam/Documents/results/VTD/billiards"
-    #yuvFile = "/Users/pam/Documents/data/VTD_yuv/billiards_f.yuv"
-
+# Take the data contained in the dataFiles in the dataPath and munge them together into an appropriate numpy array
+# return enough stuff that you can use the data array with the labels and
+def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacStep,
+             dataFiles, keyFramesOnly, addBorders):
     fileSize = os.path.getsize(yuvFile)
-    cropDim = 80
-    cropTempStep = 1
-    cropSpacStep = 16
-    num_channels = 3
-    bit_depth = 8
-    width=1280
-    height=720
     numFrames = fileSize // (width * height * 3 / 2)
-    analysisType = "All" # "ANN" or "SVM" or "Linear Regression" or "Decision Tree" or "Random Forest"
-                    # or "Naive Bayes" or "All"
-    patchWidth, patchHeight, patchedFrames, numPatches = predictNumPatches(fileSize=fileSize, cropDim=cropDim,
-                      tempStep=cropTempStep, spacStep=cropSpacStep, height=height, width=width)
 
-    dataFiles = ["qpPred.csv", "deblockPred.csv", "ipPred.csv", "diffs.csv"]
-    dataFiles = ["qpPred.csv"]
+    patchWidth, patchHeight, patchedFrames, numPatches = predictNumPatches(fileSize=fileSize, cropDim=cropDim,
+                                                                           tempStep=cropTempStep, spacStep=cropSpacStep,
+                                                                           height=height, width=width)
+
     keyFrameFiles = ["qpPred.csv", "diffs.csv"]
-    qpPred = 0
-    #dataFiles = ["qpPred.csv", "ipPred.csv", "diffs.csv"]
     labelFile = "gt.csv"
 
-    #First construct my data numpy array
+    # First construct my data numpy array
     fullDataFiles = [os.path.join(dataPath, s) for s in keyFrameFiles]
     print(fullDataFiles)
-    
+
     keyFrames = pickOutKeyFrames(fullDataFiles, patchWidth, patchHeight, numPatches, patchedFrames)
     print(keyFrames)
-    keyFramesOnly = True
-    #keyFramesOnly = False
 
     dataList = []
-    addBorders = True # because doing "true" will screw things up a little
 
     for file in dataFiles:
         filename = os.path.join(dataPath, file)
@@ -150,7 +125,6 @@ if __name__ == "__main__":
         my_data = my_data[0:numPatches]
         print("The data from the cvs file: {} and numFrames {}".format(my_data.shape, numFrames))
         if addBorders:
-            #numFrames = patchedFrames
             predsHeight = patchHeight
             predsWidth = patchWidth
 
@@ -191,8 +165,6 @@ if __name__ == "__main__":
                     reducedSet.extend(keyframe_data)
             my_data = np.asarray(reducedSet)
             numKeyFrames = len(keyFrames)
-            #patchedFrames = numFrames
-
 
         print(my_data.shape)
         my_data = my_data.tolist()
@@ -201,231 +173,250 @@ if __name__ == "__main__":
         numFrames = numKeyFrames
         patchedFrames = numKeyFrames
 
-
-    #
     numFeatures = len(dataFiles)
     if addBorders:
-        numFeatures = len(dataFiles) * 5 # Because centre plus 4 borders (maybe 8 would work better?).
+        numFeatures = len(dataFiles) * 5  # Because centre plus 4 borders (maybe 8 would work better?).
 
     numPatches = numFrames * patchHeight * patchWidth
-
-
-    # Adding in left, right, top, bottom QP values
-    #if addBorders:
-    #    filename = os.path.join(dataPath, "qpPred.csv")
-    #    normPredVals = np.genfromtxt(filename, delimiter=',')
-    #    normPredVals = normPredVals[0:numPatches]
-
-
-
-    #    numFrames = patchedFrames
-    #    predsHeight = patchHeight
-    #    predsWidth = patchWidth
-    #    normPredVals = normPredVals.reshape((numFrames, predsHeight, predsWidth))
-    #    firstCol = normPredVals[:, :, 0].reshape((numFrames, predsHeight, 1))
-    #    lastCol = normPredVals[:, :, (predsWidth - 1)].reshape((numFrames, predsHeight, 1))
-    #    firstRow = normPredVals[:, 0, :].reshape((numFrames, 1, predsWidth))
-    #    lastRow = normPredVals[:, (predsHeight - 1), :].reshape((numFrames, 1, predsWidth))
-
-    #    normPredVals_left = np.append(firstCol, normPredVals[:, :, :(predsWidth - 1)], axis=2).flatten().tolist()
-    #    normPredVals_right = np.append(normPredVals[:, :, 1:], lastCol, axis=2).flatten().tolist()
-    #    normPredVals_top = np.append(firstRow, normPredVals[:, :(predsHeight - 1), :], axis=1).flatten().tolist()
-    #    normPredVals_bottom = np.append(normPredVals[:, 1:, :], lastRow, axis=1).flatten().tolist()
-    #    print(len(normPredVals_left))
-    #    dataList.extend(normPredVals_left)
-    #    dataList.extend(normPredVals_right)
-    #    dataList.extend(normPredVals_top)
-    #    dataList.extend(normPredVals_bottom)
-    #    numFeatures = len(dataFiles) + 4
-
 
     my_data = np.asarray(dataList)
     my_data = my_data.reshape((numFeatures, numPatches))
     my_data = np.swapaxes(my_data, 0, 1)
-    #my_data = np.swapaxes(my_data, 1, 2)
-    #my_data = np.swapaxes(my_data, 2, 3)
-
+    # my_data = np.swapaxes(my_data, 1, 2)
+    # my_data = np.swapaxes(my_data, 2, 3)
 
     print(my_data.shape)
     data = my_data
-    #data = data.reshape((4, patchedFrames, patchHeight, patchWidth))
 
     filename = os.path.join(dataPath, labelFile)
     labels = np.genfromtxt(filename, delimiter=',')
     labels = labels[0:numPatches]
-    #labels = labels.reshape((patchedFrames, patchHeight, patchWidth, 1))
+    # labels = labels.reshape((patchedFrames, patchHeight, patchWidth, 1))
 
     # Analyse the data a bit in here: What is the data balance?
     unique, counts = np.unique(labels, return_counts=True)
     print("How unbalanced: {}".format(dict(zip(unique, counts))))
     labels = labels.reshape((labels.shape[0], 1))
     all_data = np.append(labels, data, axis=1)
-    #all_data = balanceByOverSampling()
     print(all_data.shape)
+    return data, labels, numFeatures
+
+def getBalancingCode(balanceType):
+    #["None", "SMOTE", "RandomOver", "RandomUnder"]
+    code = ""
+    if balanceType == "None":
+        code = '-'
+    if balanceType == "SMOTE":
+        code = 's'
+    if balanceType == "RandomOver":
+        code = 'ro'
+    if balanceType == "RandomUnder":
+        code = 'ru'
+    return code
+
+def balanceData(balanceType, trainX, trainY):
+    # ["None", "SMOTE", "RandomOver", "RandomUnder"]
+    if balanceType == "None":
+        x_train_res = trainX
+        y_train_res = trainY
+    if balanceType == "SMOTE":
+        sm = SMOTE(random_state=12, ratio=1.0)
+        x_train_res, y_train_res = sm.fit_sample(trainX, trainY)
+    if balanceType == "RandomOver":
+        sm = RandomOverSampler(random_state=12)
+        x_train_res, y_train_res = sm.fit_sample(trainX, trainY)
+    if balanceType == "RandomUnder":
+        sm = RandomUnderSampler(random_state=12)
+        x_train_res, y_train_res = sm.fit_sample(trainX, trainY)
+
+    return x_train_res, y_train_res
+
+def doNeuralNetAnalysis(trainX, trainY, testX, testY, numFeatures):
+    print("Doing analysis with fully connected neural network")
+    train_Y = np_utils.to_categorical(trainY)
+    test_Y = np_utils.to_categorical(testY)
+    inputShape = (numFeatures,)
+    chanDim = 1
+    num_classes = 2
+
+    model = Sequential()
+    model.add(Dense(32, input_shape=inputShape))
+    model.add(Activation("sigmoid"))
+    model.add(Dense(32))
+    model.add(Activation("sigmoid"))
+    model.add(Dense(num_classes))
+    model.add(Activation(tf.nn.softmax))
+
+    # initialize our initial learning rate and # of epochs to train for
+    INIT_LR = 0.01
+    EPOCHS = 4
+
+    # compile the model using SGD as our optimizer and categorical
+    # cross-entropy loss (you'll want to use binary_crossentropy
+    # for 2-class classification)
+    print("[INFO] training network...")
+    # opt = SGD(lr=INIT_LR)
+    # model.compile(loss="categorical_crossentropy", optimizer=opt,
+    #              metrics=["accuracy"])
+
+    opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
+    # opt = keras.optimizers.Adam()
+    # opt = RMSprop(0.001)
+
+    # Let's train the model using RMSprop
+    model.compile(loss='binary_crossentropy',
+                  optimizer=opt,
+                  metrics=['accuracy'])
+
+    # model.compile(loss='binary_crossentropy',
+    #              optimizer=opt,
+    #              metrics=[sensitivity, specificity])
+
+    class_weight1 = {0: 1.,
+                     1: 20.}
+    from sklearn.utils import class_weight
+
+    y_ints = [y.argmax() for y in train_Y]
+    class_weights = class_weight.compute_class_weight('balanced',
+                                                      np.unique(y_ints),
+                                                      y_ints)
+    print(class_weights)
+
+    # train the neural network
+    model.fit(trainX, train_Y, validation_data=(testX, test_Y), epochs=EPOCHS, batch_size=32,
+                  class_weight=class_weights, verbose=0)
+
+    # evaluate the network
+    print("[INFO] evaluating network...")
+    preds = model.predict(testX, verbose=0)
+    predictions = preds.argmax(axis=1)
+    #print(classification_report(testY, predictions, target_names=["0", "1"]))
+    #print(confusion_matrix(testY, predictions))
+    return predictions
+
+def getFeatureCode(dataFiles, addBorders):
+    #["qpPred.csv", "deblockPred.csv", "ipPred.csv", "diffs.csv"]
+    code = ''
+    if addBorders:
+        code = 'b'
+    for file in dataFiles:
+        if file == "qpPred.csv":
+            code = "q_{}".format(code)
+        if file == "deblockPred.csv":
+            code = "k_{}".format(code)
+        if file == "ipPred.csv":
+            code = "i_{}".format(code)
+        if file == "diffs.csv":
+            code = "d_{}".format(code)
+    return code
+
+
+def getClassifierCode(classifierType):
+    #["ANN", "SVM", "Linear Regression", "Decision Tree", "Random Forest", "Naive Bayes"]
+    code = ""
+    if classifierType == "ANN":
+        return "ann"
+    if classifierType == "SVM":
+        return "svm"
+    if classifierType == "Decision Tree":
+        return "dt"
+    if classifierType == "Random Forest":
+        return "rf"
+    if classifierType == "Naive Bayes":
+        return "NB"
+
+    return code
+
+
+
+if __name__ == "__main__":
+    dataPath = "/Users/pam/Documents/results/tree/"
+    yuvFile = "/Users/pam/Documents/data/Davino_yuv/08_TREE_f.yuv"
+    p,n = os.path.split(yuvFile)
+    filebasename,e = os.path.splitext(n)
+    print(n)
+    #dataPath = "/Users/pam/Documents/results/Davino/tank/"
+    #yuvFile = "/Users/pam/Documents/data/Davino_yuv/01_TANK_f.yuv"
+    #dataPath = "/Users/pam/Documents/results/VTD/billiards"
+    #yuvFile = "/Users/pam/Documents/data/VTD_yuv/billiards_f.yuv"
+    cropDim = 80
+    cropTempStep = 1
+    cropSpacStep = 16
+    #num_channels = 3
+    #bit_depth = 8
+    width = 1280
+    height = 720
+
+    dataFiles = ["qpPred.csv", "deblockPred.csv", "ipPred.csv", "diffs.csv"]
+    dataFiles = ["qpPred.csv"]
+    keyFramesOnly = True
+    addBorders = True
+    balanceType = "RandomOver"
+    analysisType = "All"  # "ANN" or "SVM" or "Linear Regression" or "Decision Tree" or "Random Forest"
+    # or "Naive Bayes" or "All"
+    analysisTypes = ["ANN", "SVM", "Linear Regression", "Decision Tree", "Random Forest", "Naive Bayes"]
+    analysisTypes = ["SVM", "Decision Tree", "Random Forest", "Naive Bayes"]
+
+
+    data, labels, numFeatures = prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacStep,
+                                                    dataFiles, keyFramesOnly, addBorders)
+
+
 
 
 
     (trainX, testX, trainY, testY) = train_test_split(data,labels, test_size=0.25, random_state=42)
 
     # deal with the imbalance on the training set alone (so duplication doesn't bleed across test/train split)
-    balanceData=False
-    balanceType = "RandomOver"
-    if balanceData:
-        if balanceType == "SMOTE":
-            sm = SMOTE(random_state=12, ratio=1.0)
-            x_train_res, y_train_res = sm.fit_sample(trainX, trainY)
-        if balanceType == "RandomOver":
-            sm = RandomOverSampler(random_state=12)
-            x_train_res, y_train_res = sm.fit_sample(trainX, trainY)
-        if balanceType == "RandomUnder":
-            sm = RandomUnderSampler(random_state=12)
-            x_train_res, y_train_res = sm.fit_sample(trainX, trainY)
+    trainX, trainY = balanceData(balanceType, trainX, trainY)
 
 
-        trainX = x_train_res
-        trainY = y_train_res
 
-
-    #lb = LabelBinarizer()
-    #trainY = lb.fit_transform(trainY)
-    #testY = lb.transform(testY)
     print("trainX shape:", trainX.shape)
     print("trainY shape", trainY.shape)
+    trainY = trainY.reshape((trainY.shape[0],))
 
-    #trainX = trainX.reshape((patchedFrames, patchHeight, patchWidth, 4))
-    #testX = testX.reshape((patchedFrames, patchHeight, patchWidth, 4))
-    if analysisType == "ANN" or analysisType == "All":
-        print("Doing analysis with fully connected neural network")
-        train_Y = np_utils.to_categorical(trainY)
-        test_Y = np_utils.to_categorical(testY)
-        inputShape = (numFeatures,)
-        chanDim = 1
-        num_classes = 2
+    resultsList = []
 
-        model = Sequential()
-        model.add(Dense(32, input_shape=inputShape))
-        model.add(Activation("sigmoid"))
-        model.add(Dense(32))
-        model.add(Activation("sigmoid"))
-        model.add(Dense(num_classes))
-        model.add(Activation(tf.nn.softmax))
-
-
-        #model.add(Conv2D(32, (5, 5), padding="same", input_shape=inputShape))
-        #model.add(Activation("relu"))
-        ##model.add(BatchNormalization(axis=chanDim))
-        #model.add(Conv2D(32, (5, 5), padding="same"))
-        #model.add(Activation("relu"))
-        ##model.add(BatchNormalization(axis=chanDim))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        #model.add(Dropout(0.25))
-
-        #model = Sequential()
-        #model.add(Conv2D(32, (3, 3), padding='same', input_shape=inputShape))
-        #model.add(Activation('relu'))
-        #model.add(Conv2D(32, (3, 3)))
-        #model.add(Activation('relu'))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        #model.add(Dropout(0.25))
-
-        #model.add(Conv2D(64, (3, 3), padding='same'))
-        #model.add(Activation('relu'))
-        #model.add(Conv2D(64, (3, 3)))
-        #model.add(Activation('relu'))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        #model.add(Dropout(0.25))
-
-        #model.add(Flatten())
-        #model.add(Dense(512))
-        #model.add(Activation('relu'))
-        #model.add(Dropout(0.5))
-        #model.add(Dense(num_classes))
-        ##model.add(Activation('softmax'))
-        #model.add(Activation(tf.nn.softmax))
-
-        # initialize our initial learning rate and # of epochs to train for
-        INIT_LR = 0.01
-        EPOCHS = 4
-
-        # compile the model using SGD as our optimizer and categorical
-        # cross-entropy loss (you'll want to use binary_crossentropy
-        # for 2-class classification)
-        print("[INFO] training network...")
-        #opt = SGD(lr=INIT_LR)
-        #model.compile(loss="categorical_crossentropy", optimizer=opt,
-        #              metrics=["accuracy"])
-
-        opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
-        #opt = keras.optimizers.Adam()
-        #opt = RMSprop(0.001)
-
-        # Let's train the model using RMSprop
-        model.compile(loss='binary_crossentropy',
-                      optimizer=opt,
-                      metrics=['accuracy'])
-
-        #model.compile(loss='binary_crossentropy',
-        #              optimizer=opt,
-        #              metrics=[sensitivity, specificity])
-
-        class_weight1 = {0: 1.,
-                        1: 20.}
-        from sklearn.utils import class_weight
-
-        y_ints = [y.argmax() for y in train_Y]
-        class_weights = class_weight.compute_class_weight('balanced',
-                                                          np.unique(y_ints),
-                                                          y_ints)
-        print(class_weights)
-
-        # train the neural network
-        H = model.fit(trainX, train_Y, validation_data=(testX, test_Y), epochs=EPOCHS, batch_size=32, class_weight=class_weights)
-
-        # evaluate the network
-        print("[INFO] evaluating network...")
-        predictions = model.predict(testX, batch_size=32)
-        print(classification_report(test_Y.argmax(axis=1), predictions.argmax(axis=1), target_names=["0","1"]))
+    for analysisType in analysisTypes:
+        if analysisType == "ANN":
+            predictions = doNeuralNetAnalysis(trainX, trainY, testX, testY, numFeatures)
+        elif analysisType == "Linear Regression"  or analysisType == "All":
+            print("Doing analysis with Linear Regression")
+            print("But it's not actually implemented...")
+            preditions = testY + 1
+        else:
+            if analysisType == "SVM":
+                #svclassifier = SVC(kernel='linear')
+                #svclassifier = SVC(kernel='poly', degree=8)
+                model = SVC(kernel='rbf', gamma="auto")
+                #svclassifier = SVC(kernel='sigmoid')
+                model.fit(trainX, trainY)
+                predictions = model.predict(testX)
+            if analysisType == "Decision Tree":
+                model = DecisionTreeClassifier(criterion="gini", random_state=100, max_depth=3, min_samples_leaf=5)
+                model.fit(trainX, trainY)
+                predictions = model.predict(testX)
+            if analysisType == "Random Forest":
+                model = RandomForestClassifier(n_estimators=100)
+            if analysisType == "Naive Bayes":
+                model = GaussianNB()
 
 
-        print(confusion_matrix(testY.argmax(axis=1), predictions.argmax(axis=1)))
-    if analysisType == "SVM"  or analysisType == "All":
-        print("Doing analysis with SVM")
-
-        #svclassifier = SVC(kernel='linear')
-        #svclassifier = SVC(kernel='poly', degree=8)
-        svclassifier = SVC(kernel='rbf')
-        #svclassifier = SVC(kernel='sigmoid')
-        svclassifier.fit(trainX, trainY)
-        predictions = svclassifier.predict(testX)
+            model.fit(trainX, trainY)
+            predictions = model.predict(testX)
+            #scores = cross_val_score(model, data, labels, cv=5)
+        print("Doing analysis with {}".format(analysisType))
         print(classification_report(testY, predictions))
         print(confusion_matrix(testY, predictions))
-
-    if analysisType == "Linear Regression"  or analysisType == "All":
-        print("Doing analysis with Linear Regression")
-        print("But it's not actually implemented...")
-    if analysisType == "Decision Tree"  or analysisType == "All":
-        print("Decision Tree")
-        clf = DecisionTreeClassifier(criterion="gini", random_state=100, max_depth=3, min_samples_leaf=5)
-        clf.fit(trainX, trainY)
-        predictions = clf.predict(testX)
-        print(classification_report(testY, predictions))
-        print(confusion_matrix(testY, predictions))
-
-    if analysisType == "Random Forest" or analysisType == "All":
-        from sklearn.ensemble import RandomForestClassifier
-        print("Random Forest")
-        clf = RandomForestClassifier(n_estimators=100)
-        clf.fit(trainX, trainY)
-        predictions = clf.predict(testX)
-        print(classification_report(testY, predictions))
-        print(confusion_matrix(testY, predictions))
-    if analysisType == "Naive Bayes"  or analysisType == "All":
-        print("Naive Bayes Model")
-        model_naive = GaussianNB()
-        model_naive.fit(trainX, trainY)
-        predictions = model_naive.predict(testX)
-        print(classification_report(testY, predictions))
-        print(confusion_matrix(testY, predictions))
+        print(accuracy_score(testY, predictions))
+        f1s = f1_score(testY, predictions, average=None)
+        total_f1s = np.sum(f1s)
+        print("Total f1 over both classes: {}".format(total_f1s))
+        featureCode = getFeatureCode(dataFiles, addBorders)
+        balanceCode = getBalanceCode(balanceType)
+        classifierCode = getClassifierCode(analysisType)
+        tuple = [filebasename, code, balanceCode, classifierCode]
 
     quit()
 
