@@ -31,6 +31,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.model_selection import StratifiedKFold
+import csv
 
 
 def pickOutKeyFrames(filenames, predsWidth, predsHeight, numPatches, numFrames):
@@ -97,7 +98,7 @@ def predictNumPatches(fileSize, cropDim, tempStep, spacStep, height, width):
 # Take the data contained in the dataFiles in the dataPath and munge them together into an appropriate numpy array
 # return enough stuff that you can use the data array with the labels and
 def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacStep,
-             dataFiles, keyFramesOnly, addBorders):
+             dataFiles, keyFramesOnly, addBorders, predFramesOnly):
     fileSize = os.path.getsize(yuvFile)
     numFrames = fileSize // (width * height * 3 / 2)
 
@@ -114,6 +115,11 @@ def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacSt
 
     keyFrames = pickOutKeyFrames(fullDataFiles, patchWidth, patchHeight, numPatches, patchedFrames)
     print(keyFrames)
+    allFrameNums = range(0,numFrames)
+    predFrames = list(set(allFrameNums) - set(keyFrames))
+    print(predFrames)
+    if predFramesOnly:
+        keyFrames = predFrames
 
     dataList = []
 
@@ -123,7 +129,14 @@ def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacSt
         my_data = np.genfromtxt(filename, delimiter=',')
         my_data = my_data.flatten()
         my_data = my_data[0:numPatches]
-        print("The data from the cvs file: {} and numFrames {}".format(my_data.shape, numFrames))
+
+        filename = os.path.join(dataPath, labelFile)
+        my_labels = np.genfromtxt(filename, delimiter=',')
+        my_labels = my_labels.flatten()
+        my_labels = my_labels[0:numPatches]
+
+        # labels = labels.reshape((patchedFrames, patchHeight, patchWidth, 1))
+        print("The data from the cvs file: {} the labels: {} and numFrames {}".format(my_data.shape, my_labels.shape, numFrames))
         if addBorders:
             predsHeight = patchHeight
             predsWidth = patchWidth
@@ -149,11 +162,16 @@ def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacSt
 
         else:
             my_data = my_data.reshape((1, my_data.shape[0]))
+        #labels = labels.reshape(1, numPatches)
 
+        #print(my_data.shape)
+        print("Before key frames")
         print(my_data.shape)
+        print(my_labels.shape)
 
         if keyFramesOnly:
-            reducedSet = []
+            reducedSetData = []
+            reducedSetLabels = []
             patchFrameSize = patchWidth * patchHeight
             for frame in keyFrames:
                 start = frame * patchFrameSize
@@ -162,16 +180,25 @@ def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacSt
                 for i in range(0, my_data.shape[0]):
                     keyframe_data = my_data[i, start:end].flatten()
                     keyframe_data = keyframe_data.tolist()
-                    reducedSet.extend(keyframe_data)
-            my_data = np.asarray(reducedSet)
+                    reducedSetData.extend(keyframe_data)
+                    #print("Data length {}".format(len(keyframe_data)))
+
+                keyframe_labels = my_labels[start:end].flatten()
+                keyframe_labels = keyframe_labels.tolist()
+                reducedSetLabels.extend(keyframe_labels)
+                #print("Label length {}".format(len(keyframe_labels)))
+            my_data = np.asarray(reducedSetData)
+            my_labels = np.asarray(reducedSetLabels)
+            print("After key frames")
+            print(my_data.shape)
+            print(my_labels.shape)
             numKeyFrames = len(keyFrames)
 
-        print(my_data.shape)
+        #print(my_data.shape)
         my_data = my_data.tolist()
         dataList.extend(my_data)
     if keyFramesOnly:
         numFrames = numKeyFrames
-        patchedFrames = numKeyFrames
 
     numFeatures = len(dataFiles)
     if addBorders:
@@ -185,13 +212,14 @@ def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacSt
     # my_data = np.swapaxes(my_data, 1, 2)
     # my_data = np.swapaxes(my_data, 2, 3)
 
+    #my_labels = my_labels.reshape((numPatches))
+
+    labels = my_labels
+    print(my_labels.shape)
+
     print(my_data.shape)
     data = my_data
 
-    filename = os.path.join(dataPath, labelFile)
-    labels = np.genfromtxt(filename, delimiter=',')
-    labels = labels[0:numPatches]
-    # labels = labels.reshape((patchedFrames, patchHeight, patchWidth, 1))
 
     # Analyse the data a bit in here: What is the data balance?
     unique, counts = np.unique(labels, return_counts=True)
@@ -201,7 +229,7 @@ def prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacSt
     print(all_data.shape)
     return data, labels, numFeatures
 
-def getBalancingCode(balanceType):
+def getBalanceCode(balanceType):
     #["None", "SMOTE", "RandomOver", "RandomUnder"]
     code = ""
     if balanceType == "None":
@@ -328,95 +356,166 @@ def getClassifierCode(classifierType):
     return code
 
 
+allTheFilesDavino = [["/Users/pam/Documents/results/Davino/tree/", "/Users/pam/Documents/data/Davino_yuv/08_TREE_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/cat/", "/Users/pam/Documents/data/Davino_yuv/03_CAT_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/dog/", "/Users/pam/Documents/data/Davino_yuv/10_DOG_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/girl/", "/Users/pam/Documents/data/Davino_yuv/09_GIRL_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/helicopter/", "/Users/pam/Documents/data/Davino_yuv/04_HELICOPTER_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/hen/", "/Users/pam/Documents/data/Davino_yuv/05_HEN_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/lion/", "/Users/pam/Documents/data/Davino_yuv/06_LION_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/man/", "/Users/pam/Documents/data/Davino_yuv/02_MAN_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/tank/", "/Users/pam/Documents/data/Davino_yuv/01_TANK_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/ufo/", "/Users/pam/Documents/data/Davino_yuv/07_UFO_f.yuv"],
+
+]
+
+someTheFilesDavino = [["/Users/pam/Documents/results/Davino/tank/", "/Users/pam/Documents/data/Davino_yuv/01_TANK_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/cat/", "/Users/pam/Documents/data/Davino_yuv/03_CAT_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/dog/", "/Users/pam/Documents/data/Davino_yuv/10_DOG_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/girl/", "/Users/pam/Documents/data/Davino_yuv/09_GIRL_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/helicopter/", "/Users/pam/Documents/data/Davino_yuv/04_HELICOPTER_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/hen/", "/Users/pam/Documents/data/Davino_yuv/05_HEN_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/lion/", "/Users/pam/Documents/data/Davino_yuv/06_LION_f.yuv"],
+               ["/Users/pam/Documents/results/Davino/man/", "/Users/pam/Documents/data/Davino_yuv/02_MAN_f.yuv"],
+
+               ["/Users/pam/Documents/results/Davino/ufo/", "/Users/pam/Documents/data/Davino_yuv/07_UFO_f.yuv"],
+
+]
+
 
 if __name__ == "__main__":
     dataPath = "/Users/pam/Documents/results/tree/"
     yuvFile = "/Users/pam/Documents/data/Davino_yuv/08_TREE_f.yuv"
-    p,n = os.path.split(yuvFile)
-    filebasename,e = os.path.splitext(n)
-    print(n)
-    #dataPath = "/Users/pam/Documents/results/Davino/tank/"
-    #yuvFile = "/Users/pam/Documents/data/Davino_yuv/01_TANK_f.yuv"
-    #dataPath = "/Users/pam/Documents/results/VTD/billiards"
-    #yuvFile = "/Users/pam/Documents/data/VTD_yuv/billiards_f.yuv"
-    cropDim = 80
-    cropTempStep = 1
-    cropSpacStep = 16
-    #num_channels = 3
-    #bit_depth = 8
-    width = 1280
-    height = 720
+    f = open("output.csv", "wb")
+    writer = csv.writer(f)
 
-    dataFiles = ["qpPred.csv", "deblockPred.csv", "ipPred.csv", "diffs.csv"]
-    dataFiles = ["qpPred.csv"]
-    keyFramesOnly = True
-    addBorders = True
-    balanceType = "RandomOver"
-    analysisType = "All"  # "ANN" or "SVM" or "Linear Regression" or "Decision Tree" or "Random Forest"
-    # or "Naive Bayes" or "All"
-    analysisTypes = ["ANN", "SVM", "Linear Regression", "Decision Tree", "Random Forest", "Naive Bayes"]
-    analysisTypes = ["SVM", "Decision Tree", "Random Forest", "Naive Bayes"]
+    for example in allTheFilesDavino:
+        dataPath = example[0]
+        yuvFile = example[1]
+        p,n = os.path.split(yuvFile)
+        filebasename,e = os.path.splitext(n)
+        print(n)
+        #dataPath = "/Users/pam/Documents/results/Davino/tank/"
+        #yuvFile = "/Users/pam/Documents/data/Davino_yuv/01_TANK_f.yuv"
+        #dataPath = "/Users/pam/Documents/results/VTD/billiards"
+        #yuvFile = "/Users/pam/Documents/data/VTD_yuv/billiards_f.yuv"
+        cropDim = 80
+        cropTempStep = 1
+        cropSpacStep = 16
+        #num_channels = 3
+        #bit_depth = 8
+        width = 1280
+        height = 720
 
+        dataFiles = ["qpPred.csv", "deblockPred.csv", "ipPred.csv", "diffs.csv"]
+        dataFiles = ["qpPred.csv"]
+        dataFilesList = [["qpPred.csv"],
+                         ["qpPred.csv", "diffs.csv"],
+                         ["qpPred.csv", "deblockPred.csv", "ipPred.csv", "diffs.csv"]
+                        ]
 
-    data, labels, numFeatures = prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacStep,
-                                                    dataFiles, keyFramesOnly, addBorders)
-
-
-
-
-
-    (trainX, testX, trainY, testY) = train_test_split(data,labels, test_size=0.25, random_state=42)
-
-    # deal with the imbalance on the training set alone (so duplication doesn't bleed across test/train split)
-    trainX, trainY = balanceData(balanceType, trainX, trainY)
-
-
-
-    print("trainX shape:", trainX.shape)
-    print("trainY shape", trainY.shape)
-    trainY = trainY.reshape((trainY.shape[0],))
-
-    resultsList = []
-
-    for analysisType in analysisTypes:
-        if analysisType == "ANN":
-            predictions = doNeuralNetAnalysis(trainX, trainY, testX, testY, numFeatures)
-        elif analysisType == "Linear Regression"  or analysisType == "All":
-            print("Doing analysis with Linear Regression")
-            print("But it's not actually implemented...")
-            preditions = testY + 1
-        else:
-            if analysisType == "SVM":
-                #svclassifier = SVC(kernel='linear')
-                #svclassifier = SVC(kernel='poly', degree=8)
-                model = SVC(kernel='rbf', gamma="auto")
-                #svclassifier = SVC(kernel='sigmoid')
-                model.fit(trainX, trainY)
-                predictions = model.predict(testX)
-            if analysisType == "Decision Tree":
-                model = DecisionTreeClassifier(criterion="gini", random_state=100, max_depth=3, min_samples_leaf=5)
-                model.fit(trainX, trainY)
-                predictions = model.predict(testX)
-            if analysisType == "Random Forest":
-                model = RandomForestClassifier(n_estimators=100)
-            if analysisType == "Naive Bayes":
-                model = GaussianNB()
+        keyFramesOnly = True
+        predFramesOnly = True
+        addBorders = True
+        #balanceType = "RandomOver"
+        balanceTypes = ["None", "SMOTE", "RandomOver", "RandomUnder"]
+        #analysisType = "All"  # "ANN" or "SVM" or "Linear Regression" or "Decision Tree" or "Random Forest"
+        # or "Naive Bayes" or "All"
+        analysisTypes = ["ANN", "SVM", "Linear Regression", "Decision Tree", "Random Forest", "Naive Bayes"]
+        analysisTypes = ["SVM", "Decision Tree", "Random Forest", "Naive Bayes"]
+        tuple = ["file", "features", "balancing", "classifier", "split", "TN", "FP", "FN", "TP", "accuracy", "f1 sum"]
+        resultsList = []
 
 
-            model.fit(trainX, trainY)
-            predictions = model.predict(testX)
-            #scores = cross_val_score(model, data, labels, cv=5)
-        print("Doing analysis with {}".format(analysisType))
-        print(classification_report(testY, predictions))
-        print(confusion_matrix(testY, predictions))
-        print(accuracy_score(testY, predictions))
-        f1s = f1_score(testY, predictions, average=None)
-        total_f1s = np.sum(f1s)
-        print("Total f1 over both classes: {}".format(total_f1s))
-        featureCode = getFeatureCode(dataFiles, addBorders)
-        balanceCode = getBalanceCode(balanceType)
-        classifierCode = getClassifierCode(analysisType)
-        tuple = [filebasename, code, balanceCode, classifierCode]
+        for dataFiles in dataFilesList:
+            for addBorders in [False, True]:
+                data, labels, numFeatures = prepData(dataPath, yuvFile, width, height, cropDim, cropTempStep, cropSpacStep,
+                                                                dataFiles, keyFramesOnly, addBorders, predFramesOnly)
+
+
+
+
+
+                #(trainX, testX, trainY, testY) = train_test_split(data,labels, test_size=0.25, random_state=42)
+                #print("trainX shape (from train_test_split):", trainX.shape)
+                #print("trainY shape (from train_test_split)", trainY.shape)
+
+                for balanceType in balanceTypes:
+                    skf = StratifiedKFold(n_splits=4)
+                    split = -1
+                    for train, test in skf.split(data, labels):
+                        split = split + 1
+                        trainX = np.take(data, train, axis=0)
+                        trainY = np.take(labels, train, axis=0)
+                        testX = np.take(data, test, axis=0)
+                        testY = np.take(labels, test, axis=0)
+                        print("trainX shape:", trainX.shape)
+                        print("trainY shape", trainY.shape)
+
+
+                        # deal with the imbalance on the training set alone (so duplication doesn't bleed across test/train split)
+                        trainX, trainY = balanceData(balanceType, trainX, trainY)
+
+
+
+                        print("trainX shape:", trainX.shape)
+                        print("trainY shape", trainY.shape)
+                        trainY = trainY.reshape((trainY.shape[0],))
+
+
+                        for analysisType in analysisTypes:
+                            if analysisType == "ANN":
+                                predictions = doNeuralNetAnalysis(trainX, trainY, testX, testY, numFeatures)
+                            elif analysisType == "Linear Regression"  or analysisType == "All":
+                                print("Doing analysis with Linear Regression")
+                                print("But it's not actually implemented...")
+                                preditions = testY + 1
+                            else:
+                                if analysisType == "SVM":
+                                    #svclassifier = SVC(kernel='linear')
+                                    #svclassifier = SVC(kernel='poly', degree=8)
+                                    model = SVC(kernel='rbf', gamma="auto")
+                                    #svclassifier = SVC(kernel='sigmoid')
+                                    model.fit(trainX, trainY)
+                                    predictions = model.predict(testX)
+                                if analysisType == "Decision Tree":
+                                    model = DecisionTreeClassifier(criterion="gini", random_state=100, max_depth=3, min_samples_leaf=5)
+                                    model.fit(trainX, trainY)
+                                    predictions = model.predict(testX)
+                                if analysisType == "Random Forest":
+                                    model = RandomForestClassifier(n_estimators=100)
+                                if analysisType == "Naive Bayes":
+                                    model = GaussianNB()
+
+
+                                model.fit(trainX, trainY)
+                                predictions = model.predict(testX)
+                                #scores = cross_val_score(model, data, labels, cv=5)
+                            print("Doing analysis with {}".format(analysisType))
+                            print(classification_report(testY, predictions))
+                            cm = confusion_matrix(testY, predictions)
+                            print(cm)
+                            accuracy = accuracy_score(testY, predictions)
+                            print(accuracy)
+                            f1s = f1_score(testY, predictions, average=None)
+                            total_f1s = np.sum(f1s)
+                            print("Total f1 over both classes: {}".format(total_f1s))
+                            featureCode = getFeatureCode(dataFiles, addBorders)
+                            balanceCode = getBalanceCode(balanceType)
+                            classifierCode = getClassifierCode(analysisType)
+                            tuple = [filebasename, featureCode, balanceCode, classifierCode, split, cm[0,0], cm[0,1], cm[1,0], cm[1,1], accuracy, total_f1s]
+                            resultsList.append(tuple)
+                            writer.writerow(tuple)
+                            f.flush()
+                            print(tuple)
+
+    print("****************************************************************")
+    print("And now for the grand reveal")
+    for tuple in resultsList:
+        print(tuple)
+    with open("output_all.csv", "wb") as f:
+        writer = csv.writer(f)
+        writer.writerows(resultsList)
 
     quit()
 
