@@ -12,6 +12,7 @@ data set, compile the program and train the model.
 
 Originally scavenged from:
 http://tensorflow.org/tutorials/deep_cnn/
+And then adapted to run with the FaceForensics dataset.
 """
 from __future__ import absolute_import
 from __future__ import division
@@ -1646,22 +1647,11 @@ def convertAVItoYUV(infilename):
 
 def main(argv=None):  # pylint: disable=unused-argument
 
-    #davino = getAverageQPinCSVs("/Users/pam/Documents/results/Davino/")
-    #rt = getAverageQPinCSVs("/Users/pam/Documents/results/realisticTampering/")
-    #sulfa = getAverageQPinCSVs("/Users/pam/Documents/results/SULFA/")
-    #print("Average for davino {}, realisticTampering {}, SULFA {}".format(davino, rt, sulfa))
-    #quit()
 
     resultsLog = open("resultsLog.txt", "w")
     resultsLog.write("file; tp; tn; fp; fn; mcc; f1; iouResult; frames")
 
     runAbunch = True
-    #runAbunch = True
-    #yuvfileslist = yuvfileslist_VTD + yuvfileslist_video + yuvfileslist_VTD2
-    #recomp0 = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", "/Users/pam/Documents/results/Comp")
-    #recomp1 = createFileList("/Volumes/LaCie/data/yuv_testOnly/CompAndReComp_supp", "/Users/pam/Documents/results/Comp")
-    #recomp2 = createFileList("/Volumes/LaCie/data/yuv_testOnly/1stComp", "/Users/pam/Documents/results/Comp")
-    #recomp = recomp0 + recomp1 + recomp2
     faceForensics = createFileList2("/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed",
                                    "/Users/pam/Documents/results/FaceForensics")
     print(faceForensics)
