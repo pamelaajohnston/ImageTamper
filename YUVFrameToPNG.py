@@ -88,6 +88,29 @@ if __name__ == "__main__":
         ["/Users/pam/Documents/data/Davino_yuv/08_TREE_f.yuv", "fig_tree_f.png", 10, 1280, 720],
         ["/Users/pam/Documents/data/Davino_yuv/08_TREE_mask.yuv", "fig_tree_mask.png", 10, 1280, 720],
     ]
+
+    entries = [
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/mobile_cif_qp0.yuv", "fig_mobile_qp0.png", 0, 352, 288],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/mobile_cif_qp14.yuv", "fig_mobile_qp14.png", 0, 352, 288],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/mobile_cif_qp28.yuv", "fig_mobile_qp28.png", 0, 352, 288],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/mobile_cif_qp42.yuv", "fig_mobile_qp42.png", 0, 352, 288],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/tempete_qp42.yuv", "fig_tempete_qp42_194.png", 194, 352, 288],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/tempete_cif.yuv", "fig_tempete_cif_194.png", 194, 352, 288],
+    ]
+    entries = [
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/pretty_352x352_qp0.yuv", "pretty_qp0.png", 0, 352, 352],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/pretty_352x352_qp14.yuv", "pretty_qp14.png", 0, 352, 352],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/pretty_352x352_qp28.yuv", "pretty_qp28.png", 0, 352, 352],
+        ["/Users/pam/Documents/MyWriting/thesisDraw.io/compression/pretty_352x352_qp42.yuv", "pretty_qp42.png", 0, 352, 352],
+    ]
+
+    entries = [
+        ["/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed_firstSampleDownload/test/altered/1aJO2VkfZiY_2_EMLALfhSftA_0_640x480.yuv", "fig_ff_full_alt.png", 0, 640, 480],
+        ["/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed_firstSampleDownload/test/original/1aJO2VkfZiY_2_EMLALfhSftA_0_640x480.yuv", "fig_ff_full_ori.png", 0, 640, 480],
+        ["/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed_firstSampleDownload/test/altered/1aJO2VkfZiY_2_EMLALfhSftA_0_cropped_146x178.yuv", "fig_ff_crop_alt.png", 0, 146, 178],
+        ["/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed_firstSampleDownload/test/original/1aJO2VkfZiY_2_EMLALfhSftA_0_cropped_146x178.yuv", "fig_ff_crop_ori.png", 0, 146, 178],
+    ]
+
     invert=False
 
     for entry in entries:

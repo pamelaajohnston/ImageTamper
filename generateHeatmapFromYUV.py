@@ -453,10 +453,10 @@ def doEverything(resultsLog, threshold=1):
     #doPatching = True # Patches up the YUV file
     #doEvaluation = True # Evaluates the patches using whatever networks are programmed (takes ages but saves results to file)
     #doClustering = True # Clusters the results somehow - sub options are available
-    #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
+    doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
     #doYUVSummary = True #extracts only the key frames to a summary file
     #doGroundTruthProcessing = True # takes the ground truth and turns it into a csv (16x16 granularity)
-    #doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
+    doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
     #doIOU = True # Actually compares clusters to gt using IOU, F1, MCC, TPR, FPR among other things
     doHeatmaps = True
     #multiTruncatedOutput = True
@@ -1668,7 +1668,7 @@ def main(argv=None):  # pylint: disable=unused-argument
 
     if runAbunch:
         #for entry in yuvfileslist:
-        for entry in faceForensics:
+        for entry in yuvfileslist_davino:
             FLAGS.data_dir = entry[0]
             FLAGS.yuvfile = entry[1]
             FLAGS.heatmap = entry[2]

@@ -100,8 +100,8 @@ def createDataset(indexNumer, pathToSource, pathToDst):
 
 def createFilePairs(sourceTopDir):
     filePairs = []
-    #for set in ["test", "train", "val"]:
-    for set in ["test"]:
+    for set in ["test", "train", "val"]:
+    #for set in ["train"]:
         mainDir = os.path.join(sourceTopDir, set)
         # create related file pairs
         originalDir = os.path.join(mainDir, "original")
@@ -172,6 +172,10 @@ def processFilePair(o, a, tidyUp=False):
     maxX = addBorder(maxX, width, alignTo16grid, 8)
     minY = addBorder(minY, height, alignTo16grid, -8)
     maxY = addBorder(maxY, height, alignTo16grid, 8)
+    if (maxX - minX) < 96:
+        maxX = minX + 96
+    if (maxY - minY) < 96:
+        maxY = minY + 96
     print("adjusted bounding box ({},{}) to ({},{})".format(minX, minY, maxX, maxY))
 
     croppedWidth = maxX - minX
@@ -192,15 +196,21 @@ def processFilePair(o, a, tidyUp=False):
     print("Made files {} and {}".format(oCropName, aCropName))
 
     if tidyUp:
-        os.remove(oyuv, 'u1')
-        os.remove(ayuv, 'u1')
-    quit()
+        os.remove(oyuvname)
+        os.remove(ayuvname)
+    #quit()
 
 
 if __name__ == "__main__":
 
     sourceTopDir = "/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed/"
     destTopDir = "/Volumes/LaCie/data/FaceForensics/SampleDataset"
+
+    sourceTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/"
+    destTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_YUV"
+
+    sourceTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed_firstSampleDownload/"
+    destTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_YUV"
 
     filePairs = createFilePairs(sourceTopDir)
     tidyUp = False

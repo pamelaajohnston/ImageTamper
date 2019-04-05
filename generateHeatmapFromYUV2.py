@@ -451,15 +451,15 @@ def doEverything(resultsLog, threshold=1):
 
     #doFrameDiffs = True
     #doSelectedFramesOnly = True # selects some frame from one of the tables
-    #doPatching = True # Patches up the YUV file
-    #doEvaluation = True # Evaluates the patches using whatever networks are programmed (takes ages but saves results to file)
+    doPatching = True # Patches up the YUV file
+    doEvaluation = True # Evaluates the patches using whatever networks are programmed (takes ages but saves results to file)
     #doClustering = True # Clusters the results somehow - sub options are available
     #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
     #doYUVSummary = True #extracts only the key frames to a summary file
     #doGroundTruthProcessing = True # takes the ground truth and turns it into a csv (16x16 granularity)
     #doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
     #doIOU = True # Actually compares clusters to gt using IOU, F1, MCC, TPR, FPR among other things
-    doHeatmaps = True
+    #doHeatmaps = True
     #multiTruncatedOutput = True
 
     numPatches = 0
@@ -471,10 +471,16 @@ def doEverything(resultsLog, threshold=1):
     # We'll create the patches locally and save them.
     myDataDirName = "temp"
     myHeatmapFileDir = FLAGS.heatmap
+    #HackyHack...
+    if tf.gfile.Exists(myHeatmapFileDir):
+        print("already exists")
+        return
+
     if doEvaluation:
         if tf.gfile.Exists(myDataDirName):
             tf.gfile.DeleteRecursively(myDataDirName)
         tf.gfile.MakeDirs(myDataDirName)
+
 
     #if tf.gfile.Exists(myHeatmapFileDir):
     #    tf.gfile.DeleteRecursively(myHeatmapFileDir)
@@ -491,6 +497,11 @@ def doEverything(resultsLog, threshold=1):
     diffsCSV = os.path.join(myHeatmapFileDir, "diffs.csv")
 
     width, height = pi.getDimsFromFileName(inFilename)
+    #Proviso...
+    if "zfFu1Iu01X8_0_z3YPGJokEno_0_cropped_206x222" in inFilename:
+        width=206
+        height=222
+
     print(width,height)
 
     cropDim = FLAGS.cropDim
@@ -1250,6 +1261,7 @@ def doEverything(resultsLog, threshold=1):
                     numFrames = 1
 
                 predsPerFrame = predVals.shape[0] // numFrames
+                #hack
                 # print(predVals.reshape((predsHeight, predsWidth)))
                 print(myHeatmapFileName)
                 print("numFrames {} predsWidth {} predsHeight {} predsPerFrame {}".format(numFrames,
@@ -1440,6 +1452,27 @@ def createFileList2(srcDir="/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", res
             #print(os.path.join(dirName, filename))
             #if filename.endswith("yuv") or filename.endswith("avi"):
             if filename.endswith("avi"):
+                baseFileName, ext = os.path.splitext(filename)
+                p, set = os.path.split(dirName)
+                p, state = os.path.split(p)
+                if set == "mask":
+                    continue
+                resultsFolder = "{}_{}_{}".format(baseFileName, state, set)
+                r = os.path.join(resultsDir, resultsFolder)
+                tuple = [dirName,filename,r]
+                fileList.append(tuple)
+    return fileList
+
+
+def createFileList3(srcDir="/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", resultsDir="/Users/pam/Documents/results/Comp"):
+    fileList = []
+    index = 0
+    # First, create a list of the files to encode, along with dimensions
+    for (dirName, subdirList, filenames) in os.walk(srcDir):
+        for filename in filenames:
+            #print(os.path.join(dirName, filename))
+            #if filename.endswith("yuv") or filename.endswith("avi"):
+            if filename.endswith("yuv") and ("cropped" in filename):
                 baseFileName, ext = os.path.splitext(filename)
                 p, set = os.path.split(dirName)
                 p, state = os.path.split(p)
@@ -1652,9 +1685,12 @@ def main(argv=None):  # pylint: disable=unused-argument
     resultsLog.write("file; tp; tn; fp; fn; mcc; f1; iouResult; frames")
 
     runAbunch = True
-    faceForensics = createFileList2("/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed",
+    faceForensics = createFileList3("/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed",
                                    "/Users/pam/Documents/results/FaceForensics")
+    faceForensics = createFileList3("/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/",
+                                   "/Volumes/LaCie/data/FaceForensics/FullResults")
     print(faceForensics)
+    #quit()
 
     if runAbunch:
         #for entry in yuvfileslist:
@@ -1670,6 +1706,8 @@ def main(argv=None):  # pylint: disable=unused-argument
                 FLAGS.data_dir = "."
                 FLAGS.yuvfile = tempfilename
                 #removeYUV = True
+
+
 
             #for threshold in range(0, 8, 1):
             doEverything(resultsLog, threshold=0)

@@ -189,7 +189,35 @@ def getDimsFromFileName(vid):
     if "1080p" in vid:
         return 1920, 1080
 
-    dims = re.search(r'([0-9]+)[x|X]([0-9]+)', vid)
+    #dims = re.search(r'([0-9]+)[x|X]([0-9]+)', vid)
+    if "lC97iPswEbc_0_o97H1x626cE_5_cropped_158x192" in vid:
+        width = 158
+        height = 192
+        return width, height
+    if "mKqe2lhUJPE_3_o97H1x626cE_5_cropped_408x558" in vid:
+        return 408, 558
+    if "o97H1x626cE_5_kGs7dFwf-I4_7_cropped_222x322" in vid:
+        return 222, 322
+    if "ojzk4uzxY3c_1_o97H1x626cE_5_cropped_134x170" in vid:
+        return 134, 170
+    if "tPT-6R-a1W0_0_tKVEzPMy9x0_0_cropped_246x342" in vid:
+        return 246, 342
+    if "tuAgtClLSxE_0_tKVEzPMy9x0_0_cropped_102x130" in vid:
+        return 102, 130
+    if "tmSjjPqbakU_0_tKVEzPMy9x0_0_cropped_110x146" in vid:
+        return 110, 146
+    if "stTeA9w9HbU_1_tKVEzPMy9x0_0_cropped_118x130" in vid:
+        return 118, 130
+    if "tKVEzPMy9x0_0_tfa5pcvxkmk_0_cropped_286x366" in vid:
+        return 286, 366
+    if "eOqzJV7q7SQ_1_pfNHlZ8WkDE_1_cropped_438x575" in vid:
+        return 438, 575
+    if "sZ8hFchh-i8_3_saQyF1FPiqw_0_cropped_418x591" in vid:
+        return 418, 591
+
+
+
+    dims = re.search(r'([0-9]+)[x]([0-9]+)', vid)
     if dims:
         width = int(dims.group(1))
         height = int(dims.group(2))
