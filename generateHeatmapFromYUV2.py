@@ -247,6 +247,14 @@ frameDiffNetwork = {
     "predFilename": "diffs.csv"
 }
 
+predNetwork = {
+    "summary": "predictions",
+    "num_classes": 2,
+    "network_architecture": 28,
+    "checkpoint_dir": "dummy",
+    "predFilename": "predictions.csv"
+}
+
 
 #keyframesNetwork = {
 #    "summary": "keyframes",
@@ -278,6 +286,9 @@ def deriveMaskFilename(filename):
         maskfilename = filename.replace("_f.yuv", "_mask.yuv")
     if "realisticTampering" in filename:
         maskfilename = filename.replace("all", "mask")
+    if "FaceForensics" in filename:
+        maskfilename = filename.replace("original", "mask")
+        maskfilename = maskfilename.replace("altered", "mask")
 
     return maskfilename
 
@@ -448,15 +459,16 @@ def doEverything(resultsLog, threshold=1):
     doIOU = False
     doHeatmaps = False
     multiTruncatedOutput = False
+    skipExisting = False
 
-    #doFrameDiffs = True
+    doFrameDiffs = True
     #doSelectedFramesOnly = True # selects some frame from one of the tables
     doPatching = True # Patches up the YUV file
     doEvaluation = True # Evaluates the patches using whatever networks are programmed (takes ages but saves results to file)
     #doClustering = True # Clusters the results somehow - sub options are available
     #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
     #doYUVSummary = True #extracts only the key frames to a summary file
-    #doGroundTruthProcessing = True # takes the ground truth and turns it into a csv (16x16 granularity)
+    doGroundTruthProcessing = True # takes the ground truth and turns it into a csv (16x16 granularity)
     #doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
     #doIOU = True # Actually compares clusters to gt using IOU, F1, MCC, TPR, FPR among other things
     #doHeatmaps = True
@@ -472,9 +484,10 @@ def doEverything(resultsLog, threshold=1):
     myDataDirName = "temp"
     myHeatmapFileDir = FLAGS.heatmap
     #HackyHack...
-    if tf.gfile.Exists(myHeatmapFileDir):
-        print("already exists")
-        return
+    if skipExisting:
+        if tf.gfile.Exists(myHeatmapFileDir):
+            print("already exists")
+            return
 
     if doEvaluation:
         if tf.gfile.Exists(myDataDirName):
@@ -501,6 +514,9 @@ def doEverything(resultsLog, threshold=1):
     if "zfFu1Iu01X8_0_z3YPGJokEno_0_cropped_206x222" in inFilename:
         width=206
         height=222
+    if "stTeA9w9HbU_1_tKVEzPMy9x0_0" in inFilename:
+        width = 640
+        height = 480
 
     print(width,height)
 
@@ -961,11 +977,22 @@ def doEverything(resultsLog, threshold=1):
         mybytes = mybytes[:, 0:frameSize] # Take only Y component
         mybytes = mybytes.reshape((numFrames, height, width))
         patchesList = []
+        yStart = (cropDim//2)
+        yEnd = (height - (cropDim//2))
+        xStart = (cropDim//2)
+        xEnd = (width - (cropDim//2))
+        yStart = 0
+        yEnd = (height - (cropDim))
+        xStart = 0
+        xEnd = (width - (cropDim))
+        print("GroundTruth: yStart {} yEnd {} xStart {} xEnd {} patchDim {}".format(yStart, yEnd, xStart, xEnd, cropDim))
         for f in range(0, numFrames, cropTempStep):
-            for y in range((cropDim//2), (height - (cropDim//2)), cropSpacStep):
-                yend = y + cropSpacStep
-                for x in range((cropDim//2), (width - (cropDim//2)), cropSpacStep):
-                    xend = x + cropSpacStep
+            for y in range(yStart, yEnd, cropSpacStep):
+                #yend = y + cropSpacStep
+                yend = y + cropDim
+                for x in range(xStart, xEnd, cropSpacStep):
+                    #xend = x + cropSpacStep
+                    xend = x + cropDim
                     patch = mybytes[f, y:yend, x:xend]
                     patch = patch.flatten()
                     if "Davino" in maskFilename:
@@ -976,11 +1003,19 @@ def doEverything(resultsLog, threshold=1):
                     label = 0
                     if np.sum(patch) != 0:
                         label = 1
+                    # redo - less than half, label it authentic
+                    label1Pels = np.count_nonzero(patch)
+                    minPosPatchPels = 2304
+                    if label1Pels > minPosPatchPels:
+                        label = 1
+                    else:
+                        label = 0
                     #print("the label is {}".format(label))
 
                     patchesList.append(label)
         patches = np.asarray(patchesList)
-        print("There are {} patches from a {} by {} file".format(patches.shape, width, height))
+        totalGTpositives = np.count_nonzero(patches)
+        print("There are {} patches from a {} by {} file, and {} non-zero, {} total positives".format(patches.shape, width, height, np.count_nonzero(patches), totalGTpositives))
         np.savetxt(gtCSV, patches, delimiter=',', fmt='%1.0f')
         print("Finished turning mask.yuv into gt.csv")
 
@@ -988,7 +1023,8 @@ def doEverything(resultsLog, threshold=1):
         print("Doing Averages")
         # First check that the mask is available:
 
-        filesToCheck = [qpNetwork['predFilename'], diffsCSV]
+        #filesToCheck = [qpNetwork['predFilename'], diffsCSV]
+        filesToCheck = [qpNetwork['predFilename'], ]
         predsPerFrame = predsWidth * predsHeight
         totalPreds = predsPerFrame * keyFrames.shape[0]
 
@@ -1034,14 +1070,17 @@ def doEverything(resultsLog, threshold=1):
             mask1_w = np.empty(mask1.shape)
             mask1_w.fill(1 / mask1.shape[0])
 
-            n0, bins0, patches0 = plt.hist([mask0, mask1],
-                                           bins=bins,
-                                           color=['#fffb00', '#000000'],
-                                           weights=[mask0_w, mask1_w],
-                                           label=['authentic', 'masked'],
-                                           rwidth=1.0)
-            #n1, bins1, patches1 = plt.hist(predVals[np.where(gtVals == 1)], bins=bins, facecolor='yellow', alpha = 0.5, normed=1)
-            plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
+            # n0, bins0, patches0 = plt.hist([mask0, mask1],
+            #                               bins=bins,
+            #                               color=['#fffb00', '#000000'],
+            #                               weights=[mask0_w, mask1_w],
+            #                               label=['authentic', 'masked'],
+            #                               rwidth=1.0)
+            # n1, bins1, patches1 = plt.hist(predVals[np.where(gtVals == 1)], bins=bins, facecolor='yellow', alpha = 0.5, normed=1)
+            plt.hist(mask0, bins=bins, label="Authentic", color='b', alpha=0.5, weights=mask0_w)
+            plt.hist(mask1, bins=bins, label="Tampered", color='r', alpha=0.5, weights=mask1_w)
+
+            # plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
             plt.title("Mask Histogram")
             plt.xlabel(xLabel)
             plt.ylabel("Frequency")
@@ -1214,15 +1253,19 @@ def doEverything(resultsLog, threshold=1):
 
     # Now generate the heatmap from the preds in "pred.csv"
     if doHeatmaps:
-        heatmapNetworks = [qpNetwork, ipNetwork, deblockNetwork]
+        #heatmapNetworks = [qpNetwork, ipNetwork, deblockNetwork]
+        heatmapNetworks = [qpNetwork,]
+        #heatmapNetworks = [predNetwork, ]
         print("Begin generating heatmaps")
         # 0 is all the networks, 1 is the clusters, 2 is the diffs, 3 is the ground truth
         #for generateAll in [0, 1, 2, 3]:
-        for generateAll in [0, 2]:
+        for generateAll in [0,]:
             for network in heatmapNetworks:
                 doBorders = True
                 predsWidth = (width - cropDim) // cropSpacStep
                 predsHeight = (height - cropDim) // cropSpacStep
+                if height == 1080:
+                    predsHeight = (1088 - cropDim) // cropSpacStep
                 # This is because we're using 8 labels.
                 multiplier = 256 // network['num_classes']
 
@@ -1306,6 +1349,7 @@ def doEverything(resultsLog, threshold=1):
     #    tf.gfile.DeleteRecursively(myDataDirName)
     if tf.gfile.Exists(FLAGS.eval_dir):
         tf.gfile.DeleteRecursively(FLAGS.eval_dir)
+    return totalGTpositives
 
 def getAverageQPinCSVs(dir):
     print(dir)
@@ -1352,17 +1396,29 @@ yuvfileslist_video =[
     ["/Users/pam/Documents/data/SULFA_yuv/", "10_f.yuv", "/Users/pam/Documents/results/SULFA/10"],
 ]
 
-yuvfileslist_davino =[
-    ["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_f.yuv", "/Users/pam/Documents/results/Davino/tank"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_f.yuv", "/Users/pam/Documents/results/Davino/man"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_f.yuv", "/Users/pam/Documents/results/Davino/helicopter"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_f.yuv", "/Users/pam/Documents/results/Davino/hen"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "06_LION_f.yuv", "/Users/pam/Documents/results/Davino/lion"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_f.yuv", "/Users/pam/Documents/results/Davino/ufo"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "09_GIRL_f.yuv", "/Users/pam/Documents/results/Davino/girl"],
-    ["/Users/pam/Documents/data/Davino_yuv/", "10_DOG_f.yuv", "/Users/pam/Documents/results/Davino/dog"],
+yuvfileslist_davino_fake =[
+    ["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_f.yuv", "/Users/pam/Documents/results/Davino/tank_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_f.yuv", "/Users/pam/Documents/results/Davino/man_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_f.yuv", "/Users/pam/Documents/results/Davino/cat_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_f.yuv", "/Users/pam/Documents/results/Davino/helicopter_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_f.yuv", "/Users/pam/Documents/results/Davino/hen_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "06_LION_f.yuv", "/Users/pam/Documents/results/Davino/lion_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_f.yuv", "/Users/pam/Documents/results/Davino/ufo_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_f.yuv", "/Users/pam/Documents/results/Davino/tree_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "09_GIRL_f.yuv", "/Users/pam/Documents/results/Davino/girl_f"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "10_DOG_f.yuv", "/Users/pam/Documents/results/Davino/dog_f"],
+    ]
+yuvfileslist_davino_real = [
+    ["/Users/pam/Documents/data/Davino_yuv/", "01_TANK_r.yuv", "/Users/pam/Documents/results/Davino/tank_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "02_MAN_r.yuv", "/Users/pam/Documents/results/Davino/man_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "03_CAT_r.yuv", "/Users/pam/Documents/results/Davino/cat_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "04_HELICOPTER_r.yuv", "/Users/pam/Documents/results/Davino/helicopter_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "05_HEN_r.yuv", "/Users/pam/Documents/results/Davino/hen_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "06_LION_r.yuv", "/Users/pam/Documents/results/Davino/lion_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "07_UFO_r.yuv", "/Users/pam/Documents/results/Davino/ufo_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "08_TREE_r.yuv", "/Users/pam/Documents/results/Davino/tree_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "09_GIRL_r.yuv", "/Users/pam/Documents/results/Davino/girl_r"],
+    ["/Users/pam/Documents/data/Davino_yuv/", "10_DOG_r.yuv", "/Users/pam/Documents/results/Davino/dog_r"],
 ]
 
 
@@ -1472,11 +1528,16 @@ def createFileList3(srcDir="/Volumes/LaCie/data/yuv_testOnly/CompAndReComp", res
         for filename in filenames:
             #print(os.path.join(dirName, filename))
             #if filename.endswith("yuv") or filename.endswith("avi"):
-            if filename.endswith("yuv") and ("cropped" in filename):
+            #if filename.endswith("yuv") and ("cropped" in filename):
+            if filename.endswith("yuv") and ("oneFrame" in filename):
                 baseFileName, ext = os.path.splitext(filename)
                 p, set = os.path.split(dirName)
                 p, state = os.path.split(p)
                 if set == "mask":
+                    continue
+                if "mask" in filename:
+                    continue
+                if "test" not in dirName: #hacky hack - only doing test for now
                     continue
                 resultsFolder = "{}_{}_{}".format(baseFileName, state, set)
                 r = os.path.join(resultsDir, resultsFolder)
@@ -1688,13 +1749,17 @@ def main(argv=None):  # pylint: disable=unused-argument
     faceForensics = createFileList3("/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed",
                                    "/Users/pam/Documents/results/FaceForensics")
     faceForensics = createFileList3("/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/",
-                                   "/Volumes/LaCie/data/FaceForensics/FullResults")
+                                   "/Volumes/LaCie/data/FaceForensics/FullResults_cropped")
+    faceForensics = createFileList3("/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/",
+                                   "/Volumes/LaCie/data/FaceForensics/FullResults_fullFrame")
     print(faceForensics)
     #quit()
+    totalGTpositives = 0
 
     if runAbunch:
         #for entry in yuvfileslist:
-        for entry in faceForensics:
+        #for entry in faceForensics:
+        for entry in yuvfileslist_davino_real:
             FLAGS.data_dir = entry[0]
             FLAGS.yuvfile = entry[1]
             FLAGS.heatmap = entry[2]
@@ -1710,9 +1775,12 @@ def main(argv=None):  # pylint: disable=unused-argument
 
 
             #for threshold in range(0, 8, 1):
-            doEverything(resultsLog, threshold=0)
+            gtPositives = doEverything(resultsLog, threshold=0)
+            totalGTpositives = totalGTpositives + gtPositives
+            print("total positives {}".format(totalGTpositives))
             if removeYUV:
                 os.remove(FLAGS.yuvfile)
+
     else:
         doEverything(resultsLog, threshold=0)
 

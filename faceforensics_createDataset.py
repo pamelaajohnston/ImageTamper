@@ -130,7 +130,7 @@ def addBorder(x, width, align=False, borderSize = 8):
     return x
 
 
-def processFilePair(o, a, tidyUp=False):
+def processFilePair(o, a, tidyUp=False, crop=True, saveOneFrame=True):
     dims = getAVIFileDims(o)
     width, height = getDimsFromFileName(dims)
     channels = 3
@@ -148,6 +148,14 @@ def processFilePair(o, a, tidyUp=False):
     oFrame = oyuv[0:frameSize]
     aFrame = ayuv[0:frameSize]
 
+    if crop == False:
+        dims = "oneFrame_{}x{}".format(width, height)
+        oCropName = o.replace(".avi", "_{}.yuv".format(dims))
+        aCropName = a.replace(".avi", "_{}.yuv".format(dims))
+        f.saveToFile(oFrame, oCropName)
+        f.saveToFile(aFrame, aCropName)
+        #return
+
     odata = f.YUV420_2_YUV444(oFrame, height, width)
     adata = f.YUV420_2_YUV444(aFrame, height, width)
 
@@ -157,43 +165,48 @@ def processFilePair(o, a, tidyUp=False):
 
 
     diff = abs(odata - adata)
-    #diff420 = f.YUV444_2_YUV420(diff, height, width)
-    #f.saveToFile(diff420, "temp.yuv")
-    diffY = diff[0:(width*height)]
-    diffInds1 = np.nonzero(diff)
-    minX = np.amin(diffInds1[2])
-    maxX = np.amax(diffInds1[2])
-    minY = np.amin(diffInds1[1])
-    maxY = np.amax(diffInds1[1])
-    print("bounding box ({},{}) to ({},{})".format(minX, minY, maxX, maxY))
-    # Adjust the cropped region by adding a border
-    alignTo16grid = True
-    minX = addBorder(minX, width, alignTo16grid, -8)
-    maxX = addBorder(maxX, width, alignTo16grid, 8)
-    minY = addBorder(minY, height, alignTo16grid, -8)
-    maxY = addBorder(maxY, height, alignTo16grid, 8)
-    if (maxX - minX) < 96:
-        maxX = minX + 96
-    if (maxY - minY) < 96:
-        maxY = minY + 96
-    print("adjusted bounding box ({},{}) to ({},{})".format(minX, minY, maxX, maxY))
+    if saveOneFrame == True:
+        diff420 = f.YUV444_2_YUV420(diff, height, width)
+        maskFileName = o.replace(".avi", "_{}.yuv".format(dims))
+        maskFileName = maskFileName.replace("original", "mask")
+        f.saveToFile(diff420, maskFileName)
 
-    croppedWidth = maxX - minX
-    croppedHeight = maxY - minY
-    dims = "cropped_{}x{}".format(croppedWidth, croppedHeight)
-    odata = odata.reshape((channels, height, width))
-    adata = adata.reshape((channels, height, width))
-    oROI = odata[:, minY:maxY, minX:maxX]
-    aROI = adata[:, minY:maxY, minX:maxX]
+    if crop == True:
+        diffY = diff[0:(width*height)]
+        diffInds1 = np.nonzero(diff)
+        minX = np.amin(diffInds1[2])
+        maxX = np.amax(diffInds1[2])
+        minY = np.amin(diffInds1[1])
+        maxY = np.amax(diffInds1[1])
+        print("bounding box ({},{}) to ({},{})".format(minX, minY, maxX, maxY))
+        # Adjust the cropped region by adding a border
+        alignTo16grid = True
+        minX = addBorder(minX, width, alignTo16grid, -8)
+        maxX = addBorder(maxX, width, alignTo16grid, 8)
+        minY = addBorder(minY, height, alignTo16grid, -8)
+        maxY = addBorder(maxY, height, alignTo16grid, 8)
+        if (maxX - minX) < 96:
+            maxX = minX + 96
+        if (maxY - minY) < 96:
+            maxY = minY + 96
+        print("adjusted bounding box ({},{}) to ({},{})".format(minX, minY, maxX, maxY))
 
-    # Now save the crops to a file:
-    oCropName = o.replace(".avi", "_{}.yuv".format(dims))
-    aCropName = a.replace(".avi", "_{}.yuv".format(dims))
-    oROI420 = f.YUV444_2_YUV420(oROI, croppedHeight, croppedWidth)
-    aROI420 = f.YUV444_2_YUV420(aROI, croppedHeight, croppedWidth)
-    f.saveToFile(oROI420, oCropName)
-    f.saveToFile(aROI420, aCropName)
-    print("Made files {} and {}".format(oCropName, aCropName))
+        croppedWidth = maxX - minX
+        croppedHeight = maxY - minY
+        dims = "cropped_{}x{}".format(croppedWidth, croppedHeight)
+        odata = odata.reshape((channels, height, width))
+        adata = adata.reshape((channels, height, width))
+        oROI = odata[:, minY:maxY, minX:maxX]
+        aROI = adata[:, minY:maxY, minX:maxX]
+
+        # Now save the crops to a file:
+        oCropName = o.replace(".avi", "_{}.yuv".format(dims))
+        aCropName = a.replace(".avi", "_{}.yuv".format(dims))
+        oROI420 = f.YUV444_2_YUV420(oROI, croppedHeight, croppedWidth)
+        aROI420 = f.YUV444_2_YUV420(aROI, croppedHeight, croppedWidth)
+        f.saveToFile(oROI420, oCropName)
+        f.saveToFile(aROI420, aCropName)
+        print("Made files {} and {}".format(oCropName, aCropName))
 
     if tidyUp:
         os.remove(oyuvname)
@@ -212,14 +225,18 @@ if __name__ == "__main__":
     sourceTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed_firstSampleDownload/"
     destTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_YUV"
 
+    sourceTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/"
+    destTopDir = "/Volumes/LaCie/data/FaceForensics/FaceForensics_YUV"
+
     filePairs = createFilePairs(sourceTopDir)
     tidyUp = False
+    crop = False
     print(filePairs)
 
     for pair in filePairs:
         # run through the list and do a diff (look at first frame only).
         o,a = pair
-        processFilePair(o, a, tidyUp)
+        processFilePair(o, a, tidyUp, crop)
 
 
 

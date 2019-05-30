@@ -453,10 +453,10 @@ def doEverything(resultsLog, threshold=1):
     #doPatching = True # Patches up the YUV file
     #doEvaluation = True # Evaluates the patches using whatever networks are programmed (takes ages but saves results to file)
     #doClustering = True # Clusters the results somehow - sub options are available
-    doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
+    #doFrameAnalysis = True # need "doFrameAnalysis" if we're to extract the key frames!
     #doYUVSummary = True #extracts only the key frames to a summary file
     #doGroundTruthProcessing = True # takes the ground truth and turns it into a csv (16x16 granularity)
-    doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
+    #doAverages = True # Looks at the averages and plots a profile (for mask=0 and mask=1)
     #doIOU = True # Actually compares clusters to gt using IOU, F1, MCC, TPR, FPR among other things
     doHeatmaps = True
     #multiTruncatedOutput = True
@@ -1008,11 +1008,21 @@ def doEverything(resultsLog, threshold=1):
                 xLabel = "Predicted Quantisation Parameter"
                 xTicks = range(0, 52, 7)
                 xTickPosn = [bin+0.5 for bin in bins]
+                a_all = a_all * 7
+                v_all = v_all * 7
+                a_mask0 = a_mask0 * 7
+                v_mask0 = v_mask0 * 7
+                a_mask1 = a_mask1 * 7
+                v_mask1 = v_mask1 * 7
+                print("Averages (actual QP): File {} Overall average: {} {} nomask: {} {} mask: {} {}".format(
+                    myHeatmapFileDir, a_all, v_all, a_mask0, v_mask0, a_mask1, v_mask1))
+
             else:
                 bins = [0,1,2]
                 xLabel = "Macroblock comparison in consecutive frames"
                 xTicks = ["same", "different", ""]
                 xTickPosn = [bin+0.5 for bin in bins]
+
 
             mask0 = predVals[np.where(gtVals == 0)]
             mask1 = predVals[np.where(gtVals == 1)]
@@ -1022,14 +1032,17 @@ def doEverything(resultsLog, threshold=1):
             mask1_w = np.empty(mask1.shape)
             mask1_w.fill(1 / mask1.shape[0])
 
-            n0, bins0, patches0 = plt.hist([mask0, mask1],
-                                           bins=bins,
-                                           color=['#fffb00', '#000000'],
-                                           weights=[mask0_w, mask1_w],
-                                           label=['authentic', 'masked'],
-                                           rwidth=1.0)
+            #n0, bins0, patches0 = plt.hist([mask0, mask1],
+            #                               bins=bins,
+            #                               color=['#fffb00', '#000000'],
+            #                               weights=[mask0_w, mask1_w],
+            #                               label=['authentic', 'masked'],
+            #                               rwidth=1.0)
             #n1, bins1, patches1 = plt.hist(predVals[np.where(gtVals == 1)], bins=bins, facecolor='yellow', alpha = 0.5, normed=1)
-            plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
+            plt.hist(mask0, bins=bins, label="Authentic", color='b', alpha=0.5, weights=mask0_w)
+            plt.hist(mask1, bins=bins, label="Tampered", color='r', alpha=0.5, weights=mask1_w)
+
+            #plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
             plt.title("Mask Histogram")
             plt.xlabel(xLabel)
             plt.ylabel("Frequency")
@@ -1051,7 +1064,7 @@ def doEverything(resultsLog, threshold=1):
                 a_mask0 = np.average(predVals2[np.where(gtVals2 == 0)])
                 v_mask0 = np.var(predVals2[np.where(gtVals2 == 0)])
                 a_mask1 = np.average(predVals2[np.where(gtVals2 == 1)])
-                v_mask0 = np.var(predVals2[np.where(gtVals2 == 1)])
+                v_mask1 = np.var(predVals2[np.where(gtVals2 == 1)])
                 print("Averages: File {} and {}  key average: {} {} nomask: {} {} mask: {} {}".format(myHeatmapFileDir, f, a_all, v_all, a_mask0, v_mask0, a_mask1, v_mask1))
 
                 mask0 = predVals2[np.where(gtVals2 == 0)]
@@ -1067,12 +1080,23 @@ def doEverything(resultsLog, threshold=1):
                 mask1_w.fill(1 / mask1.shape[0])
 
                 #n0, bins0, patches0 = plt.hist(predVals2[np.where(gtVals2 == 0)], bins=bins, facecolor='blue', alpha = 0.5, normed=1)
-                n0, bins0, patches0 = plt.hist([mask0, mask1],
-                                               bins=bins,
-                                               color=['#fffb00', '#000000'],
-                                               weights=[mask0_w, mask1_w],
-                                               label=['authentic', 'masked'],
-                                               rwidth=1.0)
+                ## bumblebee style
+                #n0, bins0, patches0 = plt.hist([mask0, mask1],
+                #                               bins=bins,
+                #                               color=['#fffb00', '#000000'],
+                #                               weights=[mask0_w, mask1_w],
+                #                               label=['authentic', 'masked'],
+                #                               rwidth=1.0)
+                #n0, bins0, patches0 = plt.hist([mask0, mask1],
+                #                               bins=bins,
+                #                               color=['b', 'r'],
+                #                               alpha=0.5,
+                #                               weights=[mask0_w, mask1_w],
+                #                               label=['Authentic', 'Masked'],
+                #                               rwidth=1.0)
+                plt.hist(mask0, bins=bins, label="Authentic", color='b', alpha=0.5, weights=mask0_w)
+                plt.hist(mask1, bins=bins, label="Tampered", color='r', alpha=0.5, weights=mask1_w)
+
                 #n1, bins1, patches1 = plt.hist(predVals2[np.where(gtVals2 == 1)], bins=bins, facecolor='yellow', alpha = 0.5, normed=1)
                 plt.xticks(xTickPosn, xTicks, horizontalalignment='center')
                 plt.title("Mask Histogram")
@@ -1206,7 +1230,8 @@ def doEverything(resultsLog, threshold=1):
         print("Begin generating heatmaps")
         # 0 is all the networks, 1 is the clusters, 2 is the diffs, 3 is the ground truth
         #for generateAll in [0, 1, 2, 3]:
-        for generateAll in [0, 2]:
+        #for generateAll in [0, 2]:
+        for generateAll in [1,]:
             for network in heatmapNetworks:
                 doBorders = True
                 predsWidth = (width - cropDim) // cropSpacStep
@@ -1398,6 +1423,13 @@ yuvfileslist_VTD=[
 yuvfileslist_VTD2 = [
     ["/Users/pam/Documents/data/VTD_yuv", "audirs7_f.yuv", "/Users/pam/Documents/results/VTD/audirs7"],
 ]
+yuvfileslist_VTD3 = [
+    #["/Users/pam/Documents/data/VTD_yuv", "bowling_f.yuv", "/Users/pam/Documents/results/VTD/bowling"],
+    ["/Users/pam/Documents/data/VTD_yuv", "dahua_f.yuv", "/Users/pam/Documents/results/VTD/dahua"],
+    ["/Users/pam/Documents/data/VTD_yuv", "swann_f.yuv", "/Users/pam/Documents/results/VTD/swann"],
+
+]
+
 
 yuvfileslist_theTestSet = [
     ["/Volumes/LaCie/data/YUV_x264_encoded/yuv_quant_noDeblock_test/quant_35", "flower_cif_q35.yuv", "/Users/pam/Documents/results/testSet/flower_q35"],
@@ -1605,6 +1637,23 @@ recomp = [
           ['/Volumes/LaCie/data/yuv_testOnly/CompAndReComp', 'tempete_cif_q1.0_q1.0.yuv', '/Users/pam/Documents/results/Comp/tempete_cif_q1.0_q1.0']
           ]
 
+selected_FF = [
+    ['/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/test/altered', '1aJO2VkfZiY_2_EMLALfhSftA_0_oneFrame_640x480.yuv', '/Users/pam/Documents/results/FaceForensics/selected/1aJO2VkfZiY_2_EMLALfhSftA_0_oneFrame_640x480_test_altered'],
+    ['/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/test/original', '1aJO2VkfZiY_2_EMLALfhSftA_0_oneFrame_640x480.yuv', '/Users/pam/Documents/results/FaceForensics/selected/1aJO2VkfZiY_2_EMLALfhSftA_0_oneFrame_640x480_test_original'],
+    ['/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/test/altered',
+     'BEmHm2TaUDA_1_DdhwFUtoKzk_0_oneFrame_640x480.yuv',
+     '/Users/pam/Documents/results/FaceForensics/selected/BEmHm2TaUDA_1_DdhwFUtoKzk_0_oneFrame_640x480_test_altered'],
+    ['/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/test/original',
+     'BEmHm2TaUDA_1_DdhwFUtoKzk_0_oneFrame_640x480.yuv',
+     '/Users/pam/Documents/results/FaceForensics/selected/BEmHm2TaUDA_1_DdhwFUtoKzk_0_oneFrame_640x480_test_original'],
+    ['/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/test/altered',
+     'v_MP513a0v8_0_vjSgViWZEjY_2_oneFrame_640x480.yuv',
+     '/Users/pam/Documents/results/FaceForensics/selected/v_MP513a0v8_0_vjSgViWZEjY_2_oneFrame_640x480_test_altered'],
+    ['/Volumes/LaCie/data/FaceForensics/FaceForensics_compressed/test/original',
+     'v_MP513a0v8_0_vjSgViWZEjY_2_oneFrame_640x480.yuv',
+     '/Users/pam/Documents/results/FaceForensics/selected/v_MP513a0v8_0_vjSgViWZEjY_2_oneFrame_640x480_test_original'],
+]
+
 def convertAVItoYUV(infilename):
     # first get the dimensions so they can go in the file name
     probeCmd = "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 {}".format(infilename)
@@ -1665,10 +1714,12 @@ def main(argv=None):  # pylint: disable=unused-argument
     faceForensics = createFileList2("/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed",
                                    "/Users/pam/Documents/results/FaceForensics")
     print(faceForensics)
+    #quit()
 
     if runAbunch:
         #for entry in yuvfileslist:
-        for entry in yuvfileslist_davino:
+        #for entry in yuvfileslist_VTD3:
+        for entry in selected_FF:
             FLAGS.data_dir = entry[0]
             FLAGS.yuvfile = entry[1]
             FLAGS.heatmap = entry[2]

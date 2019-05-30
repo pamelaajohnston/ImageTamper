@@ -424,7 +424,16 @@ def calculateNumPatches(vid):
         height = int(dims.group(2))
         return predictNumPatches(80, 16, height, width)
 
-def prepData_FaceForensics(resultsDir, dataFiles, mustContains=[]):
+def deriveMaskFilename(filename):
+    maskfilename = filename.replace(".yuv", "_mask.yuv")
+    if "Davino" in filename or "VTD" in filename or "SULFA" in filename:
+        maskfilename = filename.replace("_f.yuv", "_mask.yuv")
+    if "realisticTampering" in filename:
+        maskfilename = filename.replace("all", "mask")
+
+    return maskfilename
+
+def prepData_FaceForensics(resultsDir, dataFiles, mustContains=[], useGTfiles=False):
     print("Yay, cropped FaceForensics")
     numFeatures = len(dataFiles)
 
@@ -458,10 +467,16 @@ def prepData_FaceForensics(resultsDir, dataFiles, mustContains=[]):
             print(my_data.shape[0])
             numEntries = numEntries + my_data.shape[0]
             features.extend(my_data)
-            if "altered" in filename:
-                bunchOfLabels = [1] * my_data.shape[0]
+            if useGTfiles:
+                maskFilename = deriveMaskFilename(filename)
+                with open(maskFilename, 'rb') as f:
+                    reader = csv.reader(f)
+                    bunchOfLabels = list(reader)
             else:
-                bunchOfLabels = [0] * my_data.shape[0]
+                if "altered" in filename:
+                    bunchOfLabels = [1] * my_data.shape[0]
+                else:
+                    bunchOfLabels = [0] * my_data.shape[0]
             labels.extend(bunchOfLabels)
 
         numEntries = len(features)
@@ -472,11 +487,11 @@ def prepData_FaceForensics(resultsDir, dataFiles, mustContains=[]):
         print("There are {} features of {}".format(features.shape[0], dataFile))
         print("There are {} labels of {}".format(labels.shape[0], dataFile))
 
-    mememe = np.asarray(allTheFeatures)
+    #mememe = np.asarray(allTheFeatures)
     print(allTheFeatures)
-    mememe = np.concatenate(allTheFeatures).ravel()
-    print(mememe)
-    print(mememe.shape)
+    #mememe = np.concatenate(allTheFeatures).ravel()
+    #print(mememe)
+    #print(mememe.shape)
     data = np.asarray(allTheFeatures).reshape(numFeatures, numEntries).T
     labels = np.asarray(allTheLabels).reshape(numFeatures, numEntries).T
     if numFeatures > 1:
@@ -547,7 +562,7 @@ if __name__ == "__main__":
     f = open("output.csv", "wb")
     writer = csv.writer(f)
     dataPaths = [["/Users/pam/Documents/results/FaceForensics/crops", "-"],]
-    dataPaths = [["/Volumes/LaCie/data/FaceForensics/FullResults", "-"],]
+    dataPaths = [["/Volumes/LaCie/data/FaceForensics/FullResults_cropped", "-"],]
 
     for example in dataPaths:
         dataPath = example[0]

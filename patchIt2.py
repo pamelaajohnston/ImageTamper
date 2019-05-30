@@ -214,6 +214,8 @@ def getDimsFromFileName(vid):
         return 438, 575
     if "sZ8hFchh-i8_3_saQyF1FPiqw_0_cropped_418x591" in vid:
         return 418, 591
+    if "stTeA9w9HbU_1_tKVEzPMy9x0_0_oneFrame_640x480" in vid:
+        return 640, 480
 
 
 
