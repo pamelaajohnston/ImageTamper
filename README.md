@@ -46,11 +46,11 @@ Here's an example I made myself:
 
 Untampered original:
 
-![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/imagesAndGifs/hall.gif)
+![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/hall.gif)
 
 Keep repeating the first 8 frames:
 
-![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/imagesAndGifs/hall2.gif)
+![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/hall2.gif)
 
 I've used ImageMagick again to make the GIFs and the original sequence is "hall" from [Derf's](https://media.xiph.org/video/derf/). If you look closely, you can see that I haven't quite erased the man completely, you can still see his foot. Repeating the first 8 frames of the sequence over and over again gives just enough motion that the CCTV-like video looks like it is live, but the man hasn't appeared. There are, however, other ways to remove things from videos.
 
