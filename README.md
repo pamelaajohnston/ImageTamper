@@ -9,15 +9,19 @@ There are numerous convincing video manipulation techniques being developed or a
 Video tampering and video compression have one important thing in common: they are both designed to be invisible to human eyes. Compression has always been designed to be invisible. Lossy compression in particular exploits weaknesses in human vision in order to reduce the number of bits required to represent the information. Take a look at these examples:
 
 Uncompressed:
+
 ![GIF of Uncompression](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile0_cif.gif)
 
 Quantisation Parameter set to 14:
+
 ![GIF of QP=14](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile14_cif.gif)
 
 Quantisation Parameter set to 28:
+
 ![GIF of QP=28](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile28_cif.gif)
 
 Quantisation Parameter set to 42:
+
 ![GIF of QP=42](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile42_cif.gif)
 
 The first image is a GIF representation of one of the sequences from [Derf's media collection](https://media.xiph.org/video/derf/). The seqence is "mobile", the CIF version. In [Derf's] (https://media.xiph.org/video/derf/), it is supplied as YUV, but I've translated it to a GIF using my own `toGIF.py` script (which uses ImageMagick to do the GIF part, and I started with [this tutorial](http://superfluoussextant.com/making-gifs-with-python.html)). The other three are all compressed using H.264/AVC standard. They've been compressed using the constant bitrate mode of `x264` and levels of QP=[14, 28, 42]. You can see that QP=14 doesn't look particularly different from uncompressed. At QP=28, you start to lose some visible details: some of the vertical lines in the calendar, edges are just a *little* bit more blocky. And at QP=42, it's starting to actually look terrible.
@@ -41,9 +45,11 @@ This is essentially invisible editing, and this type of tampering is already in 
 Here's an example I made myself:
 
 Untampered original:
+
 ![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/imagesAndGifs/hall.gif)
 
 Keep repeating the first 8 frames:
+
 ![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/imagesAndGifs/hall2.gif)
 
 I've used ImageMagick again to make the GIFs and the original sequence is "hall" from [Derf's](https://media.xiph.org/video/derf/). If you look closely, you can see that I haven't quite erased the man completely, you can still see his foot. Repeating the first 8 frames of the sequence over and over again gives just enough motion that the CCTV-like video looks like it is live, but the man hasn't appeared. There are, however, other ways to remove things from videos.
@@ -89,10 +95,11 @@ So, if the video tampering problem is potentially that big, and yet invisible, h
 This is a frame from one of the spliced sequence's from [D'Avino et al's dataset](https://doi.org/10.2352/ISSN.2470-1173.2017.7.MWSF-330). An extra tree has been added and it is not particularly noticable. A map of the predicted quantisation parameter, however, shows a particularly low level of compression level in the tampered area (the black region). 
 
 Similarly, the hen, also from [D'Avino et al's dataset](https://doi.org/10.2352/ISSN.2470-1173.2017.7.MWSF-330), displays a lower level of compression around the tampered region:
-![Tampered Hen](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/ig_hen_fake.png)
+![Tampered Hen](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_hen_fake.png)
 ![Tampered Hen QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_hen_qp.png)
 
 And again for the FaceForensics dataset examples:
+
 ![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_alt_pix.png)
 ![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_alt_qp.png)
 ![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_ori_pix.png)
@@ -115,39 +122,78 @@ In this way, region manipulation can be detected and localised across different 
 For the most part, I have not implemented command line arguments. Many files contain an "arguments" variable at a global level which I then repeatedly overwrite allowing me to keep track of what I've implemented. In such cases, you simply need to over-write that variable, too. I'll get round to tidying up the code at some point. Otherwise, here is a brief summary of what each file is for.
 
 `YUVFrameToPNG.py` Takes a YUV 4:2:0 file (specified by filename, width, height, frame number and output name), extracts a frame and outputs it as .png (losslessly compressed - nice!).
+
 `analyseClassifiers.ipynb` A notebook for analysing the results of some classifiers as pandas dataframes.
+
 `analyseRegressionResults.ipynb` A notebook for analysing the results of some classifiers as pandas dataframes.
+
 `averages.xlsx` analysis of VTD and D'Avino's datasets
+
 `bin_to_blackAndWhite.py` a method to change a binary file into a black and white YUV file (make it visible)
+
 `collateDuplicates.py` an analysis of a patched dataset to see how many duplicates were present
+
 `collateYUVs.py` just appending a bunch of YUVs together (with some folder/file naming conventions)
+
 `createDataset.py` Taking a load of YUV files and turning them into a patched dataset
+
 `datasetViewing_intra.ipynb` Actually look at dataset patches
+
 `dctCreation.ipynb` converting DCT coefficients to a spatial representation to look at (adapted from JM H.264 code DCT)
+
 `detectDuplicates.py` an analysis of a patched dataset to see how many duplicates were present
+
 `detectDuplicatePatches.py` an analysis of a patched dataset to see how many duplicates were present
+
 `diffs.py` just do a diff
+
 `encodeYUV.py` Take a bunch of YUV files and encode them using x264
+
 `encodeYUVandEncodeAgain.py` Take a bunch of YUV files and encode them using x264, then recompress them
-`faceforensics_createDataset.py` Turn the FaceForensic .avi files into YUV (and crop out the masked part for a balanced dataset)
+
+`faceforensics_createDataset.py` Turn the FaceForensic .avi files into YUV (and crop out the masked part for a balanced 
+dataset)
+
 `functions.py` mostly conversion between different YUV colour space and RGB, just a function library
-`generateHeatmapFromYUV.py` Take a YUV file and (optionally) extract the compression features using a trained CNN, then turn the compression features into various graphs and combine them in order to detect tampering
+
+`generateHeatmapFromYUV.py` Take a YUV file and (optionally) extract the compression features using a trained CNN, then 
+turn the compression features into various graphs and combine them in order to detect tampering
+
 `generateHeatmapFromYUV2.py` Take a YUV file and (optionally) extract the compression features using a trained CNN, then turn the compression features into various graphs and combine them in order to detect tampering, adapted slighlty for FaceForensics
+
 `generateMasks....py` in a dataset where only real and tampered counterparts are provided, make a mask by doing a binary diff of the two.
+
 `iNet....py` This is the CNN. It's for multiple GPUs but I only ever ran it on one. Requires TensorFlow 1.4 (IIRC)
+
 `matFileRead.py` because some "video files" are actually matlab files
+
 `normaliseAFile.py`
+
 `patchIt.py` take a YUV file, create patches (temporal and spatial sampling)
+
 `patchIt2.py` take a YUV file, create patches (slightly different temporal and spatial sampling)
+
 `prettyPicture.py` just some nice smooth colours to make everything look decent.
+
 `regression...` take some compression parameters, perform regression (i.e. tampering-type-specific classification)
+
 `sobel.py` take an image, run a sobel kernel over it
+
 `tamperYUV.py` combine two YUV sequences in a splice (not terrible results given how simple it is)
+
 `test_train_split.py` split a dataset into test and train, assuming no duplicates in the dataset
+
 `toGIF.py` transform a YUV or an AVI to a GIF
+
 `toYUV.py`
+
 `toYUV_PNG.py`
+
 `toy.py` and other toys - generally just graph plotting or code snippets I want to keep. Useful to me and probably no one else.
+
 `watershed.py` openCV's watershed segmentation.
+
 `yuvview.py` another function library specifically dealing with viewing YUV files.
-`imagesAndGifs` Folder containing some sample images and GIFs, usually from publicly available datasets (contact me if you need any of these removed)
+
+`imagesAndGifs` Folder containing some sample images and GIFs, usually from publicly available datasets (contact me if you 
+need any of these removed)
