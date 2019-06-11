@@ -9,16 +9,16 @@ There are numerous convincing video manipulation techniques being developed or a
 Video tampering and video compression have one important thing in common: they are both designed to be invisible to human eyes. Compression has always been designed to be invisible. Lossy compression in particular exploits weaknesses in human vision in order to reduce the number of bits required to represent the information. Take a look at these examples:
 
 Uncompressed:
-![GIF of Uncompression](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/mobile0_cif.gif)
+![GIF of Uncompression](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile0_cif.gif)
 
 Quantisation Parameter set to 14:
-![GIF of QP=14](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/mobile14_cif.gif)
+![GIF of QP=14](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile14_cif.gif)
 
 Quantisation Parameter set to 28:
-![GIF of QP=28](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/mobile28_cif.gif)
+![GIF of QP=28](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile28_cif.gif)
 
 Quantisation Parameter set to 42:
-![GIF of QP=42](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/mobile42_cif.gif)
+![GIF of QP=42](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/mobile42_cif.gif)
 
 The first image is a GIF representation of one of the sequences from [Derf's media collection](https://media.xiph.org/video/derf/). The seqence is "mobile", the CIF version. In [Derf's] (https://media.xiph.org/video/derf/), it is supplied as YUV, but I've translated it to a GIF using my own `toGIF.py` script (which uses ImageMagick to do the GIF part, and I started with [this tutorial](http://superfluoussextant.com/making-gifs-with-python.html)). The other three are all compressed using H.264/AVC standard. They've been compressed using the constant bitrate mode of `x264` and levels of QP=[14, 28, 42]. You can see that QP=14 doesn't look particularly different from uncompressed. At QP=28, you start to lose some visible details: some of the vertical lines in the calendar, edges are just a *little* bit more blocky. And at QP=42, it's starting to actually look terrible.
 
@@ -31,7 +31,7 @@ Here I only discuss quantisation parameter, but in the follow-up paper "[Video t
 
 There are several methods of video tampering, and in our paper "[A review of digital video tampering: From simple editing to full synthesis](https://www.sciencedirect.com/science/article/pii/S1742287618304146)" published in Digital Investigation, we arranged them as a spectrum of video tampering, from techniques which are somewhat limited in their content-changing abilities to fully synthetic video:
 
-![Spectrum of Manipulation](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_spectrum.png)
+![Spectrum of Manipulation](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_spectrum.png)
 
 Examining a lot of different types of tampering techniques, particularly the state-of-the-art ones, we can see that what used to only be in the domain of special effects and cinematography wizards is slowly making its way down just about anyone with a computer.
 
@@ -41,10 +41,10 @@ This is essentially invisible editing, and this type of tampering is already in 
 Here's an example I made myself:
 
 Untampered original:
-![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/hall.gif)
+![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/imagesAndGifs/hall.gif)
 
 Keep repeating the first 8 frames:
-![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/hall2.gif)
+![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/imagesAndGifs/hall2.gif)
 
 I've used ImageMagick again to make the GIFs and the original sequence is "hall" from [Derf's](https://media.xiph.org/video/derf/). If you look closely, you can see that I haven't quite erased the man completely, you can still see his foot. Repeating the first 8 frames of the sequence over and over again gives just enough motion that the CCTV-like video looks like it is live, but the man hasn't appeared. There are, however, other ways to remove things from videos.
 
@@ -54,16 +54,16 @@ I've used ImageMagick again to make the GIFs and the original sequence is "hall"
 
 Here's a snippet from a sequence from [Video Tampering Dataset](https://www.youtube.com/channel/UCZuuu-iyZvPptbIUHT9tMrA) (and its associated paper [Development of a video tampering dataset for forensic investigation by Al-Sanjary et al](https://doi.org/10.1016/j.forsciint.2016.07.013)).
 Original:
-![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/manstreet_r.gif)
+![Original Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/manstreet_r.gif)
 
 Tampered:
-![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/manstreet_f.gif)
+![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/manstreet_f.gif)
 
 This shows a spatio-temporal copy-move. Basically, *regions* of past or future frames are used to conceal the man but leave the moving car and person in the background in place.
 
 This category includes chroma-keying, where an object is filmed in front of a green screen so that its background can be accurately removed. Then the object can be spliced on to a new background. D'Avino et al used chroma-keying to create their tampered video dataset in their paper "[Autoencoder with recurrent neural networks for video forgery detection](https://doi.org/10.2352/ISSN.2470-1173.2017.7.MWSF-330)", and here's a snipped from one of their examples:
 
-![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/hen_f.gif)
+![Tampered Sequence](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/hen_f.gif)
 
 Object tampering techniques allow for greater content modification than inter-frame tampering techniques. You can remove things from the video completely or add things that were never there. Of course, these techniques have long been around in cinematography, but they were previously incredibly time-consuming and only really available via professional equipment.
 
@@ -72,10 +72,10 @@ Object tampering techniques allow for greater content modification than inter-fr
 
 This is by far the most alarming group of techniques. And even more alarming is the fact that human beings are really not great at identifying some manipulated content. The study in [Faceforensics: A large-scale video dataset for forgery detection in human faces](https://arxiv.org/abs/1803.09179) revealed that humans did little better than guessing when trying to distinguish between forged and authentic content. It really isn't surprising when you see some examples:
 
-![Tampered](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/z_ff_blueDude_640x480_1.gif)
-![Authentic](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/z_ff_blueDude_640x480_1_ori.gif)
-![Tampered](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/z_ff_woman_640x480_1.gif)
-![Authentic](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/z_ff_woman_640x480_1_ori.gif)
+![Tampered](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_blueDude_640x480_1.gif)
+![Authentic](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_blueDude_640x480_1_ori.gif)
+![Tampered](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_woman_640x480_1.gif)
+![Authentic](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_woman_640x480_1_ori.gif)
 
 That combined with [DeepFakes](https://www.bbc.co.uk/news/av/technology-43118477/deepfakes-the-face-swapping-software-explained) shows how digital puppetry, at least applied to the human face, is advancing very quickly. And [motion retargeting](https://www.youtube.com/watch?v=PCBTZh41Ris) has shown how similar digital puppetry can be performed on the whole body.
 
@@ -84,27 +84,27 @@ That combined with [DeepFakes](https://www.bbc.co.uk/news/av/technology-43118477
 
 So, if the video tampering problem is potentially that big, and yet invisible, how do we tackle it? Well, one way to tackle it is to express the video content in a different way, specifically, as compression features. Earlier, I mentioned how I trained a convolutional neural network to detect compression parameters. These compression parameters, in particular the quantisation level turn out to be very good for detecting image manipulation:
 
-![Tampered Tree](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_tree_fake.png)
-![Tampered Tree QP](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_tree_qp.png)
+![Tampered Tree](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_tree_fake.png)
+![Tampered Tree QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_tree_qp.png)
 This is a frame from one of the spliced sequence's from [D'Avino et al's dataset](https://doi.org/10.2352/ISSN.2470-1173.2017.7.MWSF-330). An extra tree has been added and it is not particularly noticable. A map of the predicted quantisation parameter, however, shows a particularly low level of compression level in the tampered area (the black region). 
 
 Similarly, the hen, also from [D'Avino et al's dataset](https://doi.org/10.2352/ISSN.2470-1173.2017.7.MWSF-330), displays a lower level of compression around the tampered region:
-![Tampered Hen](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_hen_fake.png)
-![Tampered Hen QP](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_hen_qp.png)
+![Tampered Hen](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/ig_hen_fake.png)
+![Tampered Hen QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_hen_qp.png)
 
 And again for the FaceForensics dataset examples:
-![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge14_alt_pix.png)
-![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge14_alt_qp.png)
-![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge14_ori_pix.png)
-![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge14_ori_qp.png)
+![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_alt_pix.png)
+![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_alt_qp.png)
+![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_ori_pix.png)
+![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/ig_ff_munge14_ori_qp.png)
 
-![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge62_alt_pix.png)
-![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge62_alt_qp.png)
-![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge62_ori_pix.png)
-![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/fig_ff_munge62_ori_qp.png)
+![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_alt_pix.png)
+![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_alt_qp.png)
+![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_ori_pix.png)
+![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_ori_qp.png)
 
 A quick scan through all the 640x480 test sequences from FaceForensics reveals that many tampered sequences display the same pattern: very low levels of compression around the manipulated area, but relatively high levels in other places (the tampered sequences and their QP feature maps are on the top).
-![FaceForensics](https://github.com/pamelaajohnston/ImageTamper/imagesAndGifs/z_mygif.gif)
+![FaceForensics](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_mygif.gif)
 
 In this way, region manipulation can be detected and localised across different tampered video datasets which use different tampering methods. Most importantly, the CNN used to create this representation was trained **only on authentic content**.
 
