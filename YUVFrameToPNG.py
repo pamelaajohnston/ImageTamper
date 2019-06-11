@@ -248,8 +248,33 @@ if __name__ == "__main__":
         ["/Users/pam/Documents/data/FaceForensics/FaceForensics_compressed/test/original/0r4uhJdcIQA_1_cpywXpZVP6o_6_640x480.yuv", "fig_ff_test0r_ori.png", 0, 640, 480],
     ]
 
+    entries = [
+        ["/Volumes/LaCie/data/yuv/cif/hall_cif.yuv", "hall/0.png", 0, 352, 288],
+    ]
+
+    entries = []
+    for i in range(0, 72):
+        entry = ["/Volumes/LaCie/data/yuv/cif/hall_cif.yuv", "hall/{}.png".format(i), i, 352, 288]
+        entries.append(entry)
 
     invert=False
+
+    entries = [
+        ["/Volumes/LaCie/data/yuv/cif/hall_cif.yuv", "yuv_hall.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/mobile_cif.yuv", "yuv_mobile.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/tempete_cif.yuv", "yuv_tempete.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/hall_cif.yuv", "yuv_hall.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/container_cif.yuv", "yuv_container.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/foreman_cif.yuv", "yuv_foreman.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/highway_cif.yuv", "yuv_highway.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/news_cif.yuv", "yuv_news.png", 0, 352, 288],
+        ["/Volumes/LaCie/data/yuv/cif/waterfall_cif.yuv", "yuv_waterfall.png", 0, 352, 288],
+
+    ]
+    entries = [
+        ["/Volumes/LaCie/data/yuv/cif/bus_cif.yuv", "yuv_bus.png", 0, 352, 288],
+    ]
+
 
     for entry in entries:
         infilename = entry[0]
