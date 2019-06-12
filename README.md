@@ -78,9 +78,20 @@ Object tampering techniques allow for greater content modification than inter-fr
 
 This is by far the most alarming group of techniques. And even more alarming is the fact that human beings are really not great at identifying some manipulated content. The study in [Faceforensics: A large-scale video dataset for forgery detection in human faces](https://arxiv.org/abs/1803.09179) revealed that humans did little better than guessing when trying to distinguish between forged and authentic content. It really isn't surprising when you see some examples:
 
+Tampered:
+
 ![Tampered](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_blueDude_640x480_1.gif)
+
+Authentic:
+
 ![Authentic](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_blueDude_640x480_1_ori.gif)
+
+Tampered:
+
 ![Tampered](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_woman_640x480_1.gif)
+
+Authentic:
+
 ![Authentic](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/z_ff_woman_640x480_1_ori.gif)
 
 That combined with [DeepFakes](https://www.bbc.co.uk/news/av/technology-43118477/deepfakes-the-face-swapping-software-explained) shows how digital puppetry, at least applied to the human face, is advancing very quickly. And [motion retargeting](https://www.youtube.com/watch?v=PCBTZh41Ris) has shown how similar digital puppetry can be performed on the whole body.
@@ -100,13 +111,24 @@ Similarly, the hen, also from [D'Avino et al's dataset](https://doi.org/10.2352/
 
 And again for the FaceForensics dataset examples:
 
+Tampered:
+
 ![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_alt_pix.png)
 ![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_alt_qp.png)
+
+Authetic:
+
 ![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_ori_pix.png)
-![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/ig_ff_munge14_ori_qp.png)
+![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge14_ori_qp.png)
+
+
+Tampered:
 
 ![Tampered Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_alt_pix.png)
 ![Tampered Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_alt_qp.png)
+
+Authentic:
+
 ![Authentic Face](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_ori_pix.png)
 ![Authentic Face QP](https://github.com/pamelaajohnston/ImageTamper/blob/master/imagesAndGifs/fig_ff_munge62_ori_qp.png)
 
